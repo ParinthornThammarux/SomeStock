@@ -15,3 +15,15 @@ def fetch_stock_data(ticker):
     except Exception as e:
         print(f"Error fetching data: {e}")
         return None
+#คำนวณindicators
+def calculate_indicator(ticker):
+    try:
+        end_date = datetime.today()
+        start_date = end_date - timedelta(days=30)
+        stock = yf.Ticker(ticker)
+        sdat  = stock.history(start = start_date , end = end_date)
+        sdat["MA5"] = sdat["Close"].rolling(window=5).mean()
+
+    except Exception as e:
+        print(f"Error fetching data: {e}")
+        return None
