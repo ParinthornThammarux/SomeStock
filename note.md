@@ -26,3 +26,7 @@ requir lib
 2. yfinance
 3. pandas
 4. matplotlib
+
+**ADDITIONAL**
+1. Favorite System
+2. 

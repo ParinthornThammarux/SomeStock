@@ -1,7 +1,8 @@
 import tkinter as tk
 from tkinter import ttk
 from Fetch import StockFetch
-#funtion
+from Generator import report_generator
+#funtion search stock
 def search():
     name = ticker_entry.get().strip()
     select_option = combo.get()
@@ -18,15 +19,22 @@ def search():
     result_str = result.tail(10).to_string()
     if result is not None:
         try:
-            result_str = result.tail(10).to_string()
+            result_str = result.to_string()
         except AttributeError:
             result_str = str(result)
         result_text.insert(tk.END, result_str, "center")
     else:
         result_text.insert(tk.END, "ไม่สามารถดึงข้อมูลหุ้นได้", "center")
-
+#function export
+def exporttypepdf():
+    text = result_text.get("1.0", tk.END).strip()
+    success = report_generator.exportpdf(text)
+    if success:
+        return True
 # สร้างหน้าต่างหลัก
 root = tk.Tk()
+#configure of main screen
+root.configure(bg="#CCE5FF")
 root.title("📈 Daily Stock Reporter")
 root.geometry("800x450")
 root.resizable(True, True)
@@ -51,7 +59,8 @@ search_button.pack(pady =  10)
 result_text = tk.Text(root, height=15, width=150, wrap="word")
 result_text.pack(pady=5)
 result_text.tag_configure("center", justify="center")
+#export pdf
+export_pdf = tk.Button(root,text="EXPORT PDF",command=exporttypepdf)
+export_pdf.pack(pady = 5)
 
-
-# เริ่มแอป
 root.mainloop()
