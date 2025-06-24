@@ -33,11 +33,13 @@ def exporttypepdf():
         return True
 # สร้างหน้าต่างหลัก
 root = tk.Tk()
+root.title("📈 Daily Stock Reporter")
+root.geometry("1000x800")
+root.resizable(True, True)
 #configure of main screen
 root.configure(bg="#CCE5FF")
-root.title("📈 Daily Stock Reporter")
-root.geometry("800x450")
-root.resizable(True, True)
+#confige ttk
+Style = ttk.Style()
 
 # ส่วนหัว
 title_label = ttk.Label(root, text="📈 Daily Stock Report", font=("Helvetica", 16, "bold"))
@@ -52,11 +54,12 @@ combo.pack(pady = 5, padx = 5)
 #กล่องข้อความ
 ticker_entry = ttk.Entry(root, width=20)
 ticker_entry.pack(pady=5)
+Style.configure("TEntry",fieldbackground = "#99CCFF")
 #ปุ่มค้นหา
 search_button = ttk.Button(root,text = "ค้นหา",command=search)
 search_button.pack(pady =  10)
 # กล่องแสดงผล
-result_text = tk.Text(root, height=15, width=150, wrap="word")
+result_text = tk.Text(root, height=15, width=120, wrap="word")
 result_text.pack(pady=5)
 result_text.tag_configure("center", justify="center")
 #export pdf

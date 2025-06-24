@@ -26,7 +26,16 @@ requir lib
 2. yfinance
 3. pandas
 4. matplotlib
+5. scikit-learn
 
-**ADDITIONAL**
-1. Favorite System
-2. 
+**ADDITIONAL-Requirement**
+1. Favorite System -:export favorite and importable
+2. Time Range
+3. Additional Indicator
+4. excel support
+5. optional Plotly Interactive Chart
+6. multi select
+7. auto refresh
+8. pin bar
+9. Dashboard and summary
+10. Prediction Mode
