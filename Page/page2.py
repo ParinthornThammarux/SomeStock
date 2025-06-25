@@ -47,6 +47,10 @@ class SecondWindow(QMainWindow):
         self.export_button = QPushButton("📄 ส่งออก PDF")
         self.export_button.clicked.connect(self.export_to_pdf)
         input_layout.addWidget(self.export_button)
+        
+        self.create_graph = QPushButton("Create Graph")
+        self.create_graph.clicked.connect(self.show_the_graph)
+        input_layout.addWidget(self.create_graph)
 
         self.layout.addWidget(input_frame)
 
@@ -108,3 +112,12 @@ class SecondWindow(QMainWindow):
                 QMessageBox.information(self, "✅ สำเร็จ", "ส่งออก PDF เรียบร้อยแล้ว")
             else:
                 QMessageBox.warning(self, "❌ ผิดพลาด", "ไม่สามารถส่งออก PDF ได้")
+    #---------- Export to GRAPH ----------
+    def show_the_graph(self):
+        Name = self.ticker_entry.text().strip()
+        if not Name:
+            QMessageBox.warning(self, "⚠️ ข้อมูลไม่ครบ", "กรุณากรอกชื่อหุ้นก่อน")
+            return
+        success = report_generator.exportgraph(Name)
+        if not success:
+            QMessageBox.critical(self, "❌ ผิดพลาด", "ไม่สามารถโหลดหรือแสดงกราฟได้")
