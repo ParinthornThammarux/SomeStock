@@ -25,5 +25,5 @@ def addfav(name):
 
 def removefave(name):
     current = loadfave()
-    if name in current:
+    if name in current: 
         FAVORITE_FILE.remove
