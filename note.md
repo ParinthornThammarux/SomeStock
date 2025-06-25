@@ -22,13 +22,12 @@
     """วาดกราฟราคาหุ้นย้อนหลัง + เส้น MA5/MA20 ด้วย matplotlib"""
 
 requir lib
-1. streamlit
+1. Pyside6
 2. yfinance
 3. pandas
 4. matplotlib
 5. scikit-learn
-6. fpdf
-
+✅ ❌ 
 **ADDITIONAL-Requirement**
 1. Favorite System -:export favorite and importable
 2. Time Range
