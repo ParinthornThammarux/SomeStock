@@ -27,7 +27,7 @@ requir lib
 3. pandas
 4. matplotlib
 5. scikit-learn
-
+✅ ❌
 **ADDITIONAL-Requirement**
 1. Favorite System -:export favorite and importable
 2. Time Range

@@ -26,7 +26,7 @@ class MainWindow(QMainWindow):
         
 
         self.open_second_btn = QPushButton("ไปหน้าที่สอง")
-        self.open_third_btn = QPushButton("TEST")
+        self.open_third_btn = QPushButton("Manage")
         self.open_forth_btn = QPushButton("TEST")
         self.open_zero_btn = QPushButton("TEST")
         
