@@ -49,3 +49,4 @@ class PredictionWindow(QMainWindow):
                 success = Prediction.detect_ema_cross(symbol)
             elif(option == "PEG Ratio"):
                 success = Prediction.predict_peg_ratio(symbol)
+

@@ -198,3 +198,43 @@ def predict_peg_ratio(symbol):
                 print(float(cells[i+1].text))
                 return float(cells[i+1].text)
     return None
+
+def predict_MACD(symbol):
+    data = yf.Ticker(symbol).history(period="1y").dropna()
+
+    # Calculate MACD and Signal Line
+    macd, macd_signal, macd_hist = talib.MACD(data['Close'], fastperiod=12, slowperiod=26, signalperiod=9)
+    data['MACD'] = macd
+    data['Signal'] = macd_signal
+    data['Hist'] = macd_hist
+
+    # Plot MACD and Signal Line
+    plt.figure(figsize=(14, 7))
+    plt.plot(data.index, data['MACD'], label='MACD', color='blue')
+    plt.plot(data.index, data['Signal'], label='Signal Line', color='red')
+    plt.bar(data.index, data['Hist'], label='MACD Histogram', color='grey', alpha=0.5)
+    plt.title(f"{symbol} - MACD Indicator")
+    plt.xlabel("Date")
+    plt.ylabel("MACD Value")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    # Show latest values
+    latest_macd = data['MACD'].iloc[-1]
+    latest_signal = data['Signal'].iloc[-1]
+    print(f"📈 {symbol} - Latest MACD: {latest_macd:.2f}, Signal Line: {latest_signal:.2f}")
+
+    # Determine crossover signal
+    prev_macd = data['MACD'].iloc[-2]
+    prev_signal = data['Signal'].iloc[-2]
+
+    if prev_macd < prev_signal and latest_macd > latest_signal:
+        print("📊 Bullish MACD crossover detected!")
+    elif prev_macd > prev_signal and latest_macd < latest_signal:
+        print("📉 Bearish MACD crossover detected!")
+    else:
+        print("ℹ️ No MACD crossover at the latest date.")
+
+    return latest_macd, latest_signal
