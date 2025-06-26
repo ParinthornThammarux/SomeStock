@@ -1,6 +1,7 @@
 import sys
 from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton, QWidget, QVBoxLayout,QGridLayout,QLabel
 from Page.page2 import SecondWindow
+from Page.Prediction_page import PredictionWindow
 from PySide6.QtCore import Qt
 import os
 class MainWindow(QMainWindow):
@@ -18,6 +19,7 @@ class MainWindow(QMainWindow):
 
         #build title
         title = QLabel("🗠 Welcome")
+        title.setObjectName("title")
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
@@ -27,11 +29,13 @@ class MainWindow(QMainWindow):
 
         self.open_second_btn = QPushButton("ไปหน้าที่สอง")
         self.open_third_btn = QPushButton("Manage")
-        self.open_forth_btn = QPushButton("TEST")
+        self.open_forth_btn = QPushButton("Prediction Mode")
         self.open_zero_btn = QPushButton("TEST")
         
         self.open_second_btn.setMinimumHeight(40)
         self.open_second_btn.clicked.connect(self.open_second_window)
+        self.open_forth_btn.setMinimumHeight(40)
+        self.open_forth_btn.clicked.connect(self.open_prediction_window)
 
         grid_layout.addWidget(self.open_second_btn, 0, 0)
         grid_layout.addWidget(self.open_third_btn, 0, 1)
@@ -40,12 +44,19 @@ class MainWindow(QMainWindow):
 
         layout.addLayout(grid_layout)
         self.second_window = None  # เก็บ instance หน้าที่สอง
+        self.prediction_window = None
 
     def open_second_window(self):
         if self.second_window is None:
             self.second_window = SecondWindow()
         self.second_window.show()
         self.hide()  # ซ่อนหน้าหลักไปเลย (ถ้าต้องการ)
+
+    def open_prediction_window(self):
+        if self.prediction_window is None:
+            self.prediction_window = PredictionWindow()
+        self.prediction_window.show()
+        self.hide()
 
 def load_stylesheet():
     base_path = os.path.dirname(os.path.abspath(__file__))  # ตำแหน่งไฟล์ main.py
