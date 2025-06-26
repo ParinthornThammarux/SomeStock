@@ -24,24 +24,28 @@ class PredictionWindow(QMainWindow):
         self.label_input.setPlaceholderText("Enter stock symbol (e.g., AAPL)")
         self.layout.addWidget(self.label_input)
         #make button
-        self.predict_button = QPushButton("🔮 Predict Price")
-        self.predict_button.clicked.connect(self.predict_price)
+        self.predict_button = QPushButton("🔮 Predict stock")
+        self.predict_button.clicked.connect(self.predict_stock)
         self.layout.addWidget(self.predict_button)
         #drop down optional selector
         self.combo = QComboBox()
-        self.combo.addItems(["RSI", "PricePrediction", "Hamme search" , "Doji search" , "EMA Cross" ,"Buffet Indicator"])
+        self.combo.addItems(["RSI", "PricePrediction", "Hammer search" , "Doji search" , "EMA Cross" ,"PEG Ratio"])
         self.combo.setPlaceholderText("Select an option")
         self.layout.addWidget(self.combo)
 
         #function to predict price
-    def predict_price(self):
+    def predict_stock(self):
             symbol = self.label_input.text().strip()
             option = self.combo.currentText()
             if(option == "pricePrediction"):
                 success = Prediction.predict_next_price(symbol)
-
-            success  = Prediction.predict_next_price(symbol)
-            if success:
-                QMessageBox.information(self, "Prediction Result", f"Prediction for {symbol} completed successfully!")
-            else:
-                QMessageBox.warning(self, "Prediction Error", f"Failed to predict price for {symbol}. Please check the symbol and try again.")
+            elif(option == "RSI"):
+                success = Prediction.predict_rsi(symbol)
+            elif(option == "Hammer search"):
+                success = Prediction.detect_hammer(symbol)
+            elif(option == "Doji search"):
+                success = Prediction.detect_doji(symbol)
+            elif(option == "EMA Cross"):
+                success = Prediction.detect_ema_cross(symbol)
+            elif(option == "PEG Ratio"):
+                success = Prediction.predict_peg_ratio(symbol)
