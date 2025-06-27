@@ -38,7 +38,10 @@ requir lib
 5. optional Plotly Interactive Chart ✅
 6. multi select
 7. auto refresh
-8. pin bar
+8. pin bar ✅
 9. Dashboard and summary
 10. Prediction Mode ✅
 11. index search ✅
+12. detect trend graph
+13. filter and sort stock
+14. 

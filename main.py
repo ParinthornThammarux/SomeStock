@@ -9,6 +9,7 @@ from Page.page2 import SecondWindow
 from Page.Prediction_page import PredictionWindow
 from Page.Manage_Page import ManagePage
 from Page.Other_asset import OtherAssetWindow
+from Page.Dashboard import DashboardWindow
 import os
 
 class MainWindow(QMainWindow):
@@ -39,7 +40,7 @@ class MainWindow(QMainWindow):
         self.open_forth_btn = QPushButton("Prediction Mode")
         self.open_zero_btn = QPushButton("TEST")
 
-        self.open_second_btn.clicked.connect(self.open_second_window)
+        self.open_second_btn.clicked.connect(self.open_Dashboard_page)
         self.open_third_btn.clicked.connect(self.open_Manage_window)
         self.open_forth_btn.clicked.connect(self.open_prediction_window)
 
@@ -47,14 +48,18 @@ class MainWindow(QMainWindow):
         grid_layout.addWidget(self.open_third_btn, 0, 1)
         grid_layout.addWidget(self.open_forth_btn, 1, 0)
         grid_layout.addWidget(self.open_zero_btn, 1, 1)
-
+        # Dashboard button
+        self.dashboard_button = QPushButton("Dashboard")
+        self.dashboard_button.clicked.connect(self.dashboard_page)
+        layout.addWidget(self.dashboard_button)
 
         # Windows instances
-        self.second_window = None
+        self.Dashboard_page = None
         self.prediction_window = None
         self.Manage_window = None
         self.Index_window = None
-        
+        self.dashboard_window = None
+
         layout.addLayout(grid_layout)
         # Add stretch to push the label to the bottom
         layout.addStretch()
@@ -66,12 +71,12 @@ class MainWindow(QMainWindow):
         self.bottom_right_label.setCursor(QCursor(Qt.PointingHandCursor))
         self.bottom_right_label.mouseDoubleClickEvent = lambda event: self.index_page()
         layout.addWidget(self.bottom_right_label)
-
         
-    def open_second_window(self):
-        if self.second_window is None:
-            self.second_window = SecondWindow()
-        self.second_window.show()
+        
+    def open_Dashboard_page(self):
+        if self.Dashboard_page is None:
+            self.Dashboard_page = SecondWindow()
+        self.Dashboard_page.show()
         self.hide()
 
     def open_prediction_window(self):
@@ -89,6 +94,11 @@ class MainWindow(QMainWindow):
         if self.Index_window is None:
             self.Index_window = OtherAssetWindow()
         self.Index_window.show()
+        self.hide()
+    def dashboard_page(self):
+        if self.Dashboard_page is None:
+            self.Dashboard_page = DashboardWindow()
+        self.Dashboard_page.show()
         self.hide()
 
 def load_stylesheet():
