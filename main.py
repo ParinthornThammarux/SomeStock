@@ -10,6 +10,7 @@ from Page.Prediction_page import PredictionWindow
 from Page.Manage_Page import ManagePage
 from Page.Other_asset import OtherAssetWindow
 from Page.Dashboard import DashboardWindow
+from Page.Tax_Calculator import TaxCalculatorWindow
 import os
 
 class MainWindow(QMainWindow):
@@ -53,12 +54,18 @@ class MainWindow(QMainWindow):
         self.dashboard_button.clicked.connect(self.dashboard_page)
         layout.addWidget(self.dashboard_button)
 
+        # TAX button
+        self.Tax_button = QPushButton("Tax Calculator")
+        self.Tax_button.clicked.connect(self.open_tax_calculator)
+        layout.addWidget(self.Tax_button)
+        
         # Windows instances
         self.Dashboard_page = None
         self.prediction_window = None
         self.Manage_window = None
         self.Index_window = None
         self.dashboard_window = None
+        self.Tax_window = None
 
         layout.addLayout(grid_layout)
         # Add stretch to push the label to the bottom
@@ -99,6 +106,12 @@ class MainWindow(QMainWindow):
         if self.Dashboard_page is None:
             self.Dashboard_page = DashboardWindow()
         self.Dashboard_page.show()
+        self.hide()
+
+    def open_tax_calculator(self):
+        if self.Tax_window is None:
+            self.Tax_window = TaxCalculatorWindow()
+        self.Tax_window.show()
         self.hide()
 
 def load_stylesheet():
