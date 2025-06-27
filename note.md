@@ -41,4 +41,4 @@ requir lib
 8. pin bar
 9. Dashboard and summary
 10. Prediction Mode ✅
-11. index search
+11. index search ✅

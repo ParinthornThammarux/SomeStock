@@ -6,6 +6,12 @@ import talib
 import mplfinance as mpf
 import requests
 from bs4 import BeautifulSoup
+from Fetch import Manage_FAV
+
+# For load favorite stock
+def load_fav():
+    filename = 'favorite_stocks.json'
+    favfile = Manage_FAV.loadfave()
 
 def predict_next_price(symbol):
     data = yf.Ticker(symbol).history(period="1y").dropna()  # ดึงข้อมูลย้อนหลัง 1 ปีและลบค่า NaN

@@ -33,3 +33,4 @@ def removefave(name):
     if name in current: 
         current.remove(name)
         savefave(current)
+
