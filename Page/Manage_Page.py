@@ -32,8 +32,7 @@ class ManagePage(QMainWindow):
         #Make gride for buttons
         self.grid_layout = QGridLayout()
         #Make gride for buttons
-        # self.grid_layout = QGridLayout()
-        # self.grid_layout.setSpacing(10)
+        self.ticker_entry = QLineEdit() 
         self.ticker_entry.setPlaceholderText("เช่น AAPL")
         input_layout.addWidget(QLabel("กรอกสัญลักษณ์หุ้น (เช่น AAPL):"))
         input_layout.addWidget(self.ticker_entry)

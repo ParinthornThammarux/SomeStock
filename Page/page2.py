@@ -86,7 +86,7 @@ class SecondWindow(QMainWindow):
     def search(self):
         name = self.ticker_entry.text().strip()
         select_option = self.combo.currentText()
-        self.result_text.clear()
+        # self.result_text.clear()
 
         if not name:
             self.result_text.setText("⚠️ กรุณากรอกชื่อหุ้น")

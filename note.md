@@ -29,9 +29,9 @@ requir lib
 5. scikit-learn
 6. TA-lib
 7. bs4
-✅ ❌ 
+✅ ❌ ❗️
 **ADDITIONAL-Requirement**
-1. Favorite System -:export favorite and importable
+1. Favorite System ✅
 2. Time Range
 3. Additional Indicator ✅
 4. excel support
