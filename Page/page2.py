@@ -53,6 +53,19 @@ class SecondWindow(QMainWindow):
         input_layout.addWidget(self.create_graph)
 
         self.layout.addWidget(input_frame)
+        
+        #build go back to main page button
+        back_to_main_btn = QPushButton("กลับไปหน้าหลัก")
+        back_to_main_btn.clicked.connect(self.open_Main_window)
+        self.layout.addWidget(back_to_main_btn)
+        #make back function
+        self.Main_window = None
+    def open_Main_window(self):
+        from main import MainWindow
+        if self.Main_window is None:
+            self.Main_window = MainWindow()
+        self.Main_window.show()
+        self.hide()
 
         # ---------- Result Display ----------
         self.result_text = QTextEdit()

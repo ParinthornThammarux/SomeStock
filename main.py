@@ -24,6 +24,8 @@ class MainWindow(QMainWindow):
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
+
+
         #build grid
         grid_layout = QGridLayout()
         

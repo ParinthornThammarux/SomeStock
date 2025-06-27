@@ -5,8 +5,6 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QFont, QTextCursor
 from PySide6.QtCore import Qt
 from Fetch.Manage_FAV import loadfave, savefave, addfav, removefave
-import json
-import os
 
 class ManagePage(QMainWindow):
     def __init__(self):
@@ -33,9 +31,9 @@ class ManagePage(QMainWindow):
 
         #Make gride for buttons
         self.grid_layout = QGridLayout()
-        self.grid_layout.setSpacing(10)
-
-        self.ticker_entry = QLineEdit()
+        #Make gride for buttons
+        # self.grid_layout = QGridLayout()
+        # self.grid_layout.setSpacing(10)
         self.ticker_entry.setPlaceholderText("เช่น AAPL")
         input_layout.addWidget(QLabel("กรอกสัญลักษณ์หุ้น (เช่น AAPL):"))
         input_layout.addWidget(self.ticker_entry)
@@ -59,6 +57,18 @@ class ManagePage(QMainWindow):
         input_frame.setLayout(input_layout)
         self.layout.addWidget(input_frame)
 
+    #build go back to main page button
+        back_to_main_btn = QPushButton("กลับไปหน้าหลัก")
+        back_to_main_btn.clicked.connect(self.open_Main_window)
+        self.layout.addWidget(back_to_main_btn)
+        #make back function
+        self.Main_window = None
+    def open_Main_window(self):
+        from main import MainWindow
+        if self.Main_window is None:
+            self.Main_window = MainWindow()
+        self.Main_window.show()
+        self.hide()
     # ---------- Fuction Section ----------
     def refresh_favorites(self):
         self.favorites = loadfave()
