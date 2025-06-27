@@ -44,4 +44,5 @@ requir lib
 11. index search ✅
 12. detect trend graph
 13. filter and sort stock
-14. 
+14. Tax Calculator
+15. simulation portfolio
