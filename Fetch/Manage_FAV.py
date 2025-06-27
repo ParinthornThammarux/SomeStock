@@ -10,8 +10,13 @@ import os
 
 FAVORITE_FILE = 'favorite_stocks.json'
 def loadfave():
-    with open(FAVORITE_FILE,'r') as f:
-        return json.load(f)
+    if not os.path.exists(FAVORITE_FILE):
+        return []  # ถ้าไฟล์ยังไม่มี ให้เริ่มจากลิสต์ว่าง
+    with open(FAVORITE_FILE, 'r') as f:
+        try:
+            return json.load(f)
+        except json.JSONDecodeError:
+            return []  # ถ้าไฟล์ว่างหรือไม่ใช่ JSON ถูก ให้คืนค่าเป็นลิสต์ว่าง
 
 def savefave(favorites):
     with open(FAVORITE_FILE, 'w') as f:
@@ -20,10 +25,11 @@ def savefave(favorites):
 def addfav(name):
     current = loadfave()
     if name not in current:
-        FAVORITE_FILE.append(name)
-        savefave(FAVORITE_FILE)
+        current.append(name)
+        savefave(current)
 
 def removefave(name):
     current = loadfave()
     if name in current: 
-        FAVORITE_FILE.remove
+        current.remove(name)
+        savefave(current)

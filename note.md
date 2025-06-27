@@ -33,11 +33,12 @@ requir lib
 **ADDITIONAL-Requirement**
 1. Favorite System -:export favorite and importable
 2. Time Range
-3. Additional Indicator
+3. Additional Indicator ✅
 4. excel support
-5. optional Plotly Interactive Chart
+5. optional Plotly Interactive Chart ✅
 6. multi select
 7. auto refresh
 8. pin bar
 9. Dashboard and summary
-10. Prediction Mode
+10. Prediction Mode ✅
+11. index search

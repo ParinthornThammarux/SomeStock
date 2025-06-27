@@ -3,6 +3,7 @@ QPushButton {
     color: white;
     border-radius: 5px;
     padding: 10px;
+    min-height: 40px;
 }
 
 QTextEdit {
@@ -14,6 +15,7 @@ QTextEdit {
 }
 
 QLabel#title {
+    font-family: "Arial"; 
     font-size : 36px;
     color: rgb(255, 255, 255);
 }

@@ -29,7 +29,7 @@ class PredictionWindow(QMainWindow):
         self.layout.addWidget(self.predict_button)
         #drop down optional selector
         self.combo = QComboBox()
-        self.combo.addItems(["RSI", "PricePrediction", "Hammer search" , "Doji search" , "EMA Cross" ,"PEG Ratio"])
+        self.combo.addItems(["RSI", "PricePrediction", "Hammer search" , "Doji search" , "EMA Cross" ,"PEG Ratio","MACD"])
         self.combo.setPlaceholderText("Select an option")
         self.layout.addWidget(self.combo)
 
@@ -49,4 +49,6 @@ class PredictionWindow(QMainWindow):
                 success = Prediction.detect_ema_cross(symbol)
             elif(option == "PEG Ratio"):
                 success = Prediction.predict_peg_ratio(symbol)
+            elif(option == "MACD"):
+                success = Prediction.predict_MACD(symbol)
 

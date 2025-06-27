@@ -2,6 +2,7 @@ import sys
 from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton, QWidget, QVBoxLayout,QGridLayout,QLabel
 from Page.page2 import SecondWindow
 from Page.Prediction_page import PredictionWindow
+from Page.Manage_Page import ManagePage
 from PySide6.QtCore import Qt
 import os
 class MainWindow(QMainWindow):
@@ -32,10 +33,10 @@ class MainWindow(QMainWindow):
         self.open_forth_btn = QPushButton("Prediction Mode")
         self.open_zero_btn = QPushButton("TEST")
         
-        self.open_second_btn.setMinimumHeight(40)
         self.open_second_btn.clicked.connect(self.open_second_window)
-        self.open_forth_btn.setMinimumHeight(40)
+        self.open_third_btn.clicked.connect(self.open_Manage_window)
         self.open_forth_btn.clicked.connect(self.open_prediction_window)
+        
 
         grid_layout.addWidget(self.open_second_btn, 0, 0)
         grid_layout.addWidget(self.open_third_btn, 0, 1)
@@ -45,6 +46,7 @@ class MainWindow(QMainWindow):
         layout.addLayout(grid_layout)
         self.second_window = None  # เก็บ instance หน้าที่สอง
         self.prediction_window = None
+        self.Manage_window = None
 
     def open_second_window(self):
         if self.second_window is None:
@@ -56,6 +58,12 @@ class MainWindow(QMainWindow):
         if self.prediction_window is None:
             self.prediction_window = PredictionWindow()
         self.prediction_window.show()
+        self.hide()
+
+    def open_Manage_window(self):
+        if self.Manage_window is None:
+            self.Manage_window = ManagePage()
+        self.Manage_window.show()
         self.hide()
 
 def load_stylesheet():
