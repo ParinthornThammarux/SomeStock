@@ -244,3 +244,29 @@ def predict_MACD(symbol):
         print("ℹ️ No MACD crossover at the latest date.")
 
     return latest_macd, latest_signal
+
+def predict_price_polynomial(symbol , degree=2):
+    
+    data = yf.Ticker(symbol).history(period="1y").dropna()  # ดึงข้อมูลย้อนหลัง 1 ปีและลบค่า NaN
+    data = data.reset_index()
+
+    y = data['Close'].values
+    x = np.arange(len(y))
+
+    coefficients = np.polyfit(x, y, degree)
+    polynomial = np.poly1d(coefficients)
+
+    next_x = np.array([len(y)])  # วันถัดไป
+    predicted_y = polynomial(next_x)
+    print(f"📈 {symbol} - Predicted next close price using polynomial regression: ${predicted_y[0]:.2f}")
+    plt.figure(figsize=(10, 5))
+    plt.plot(x, y, label='Actual Price', color='blue')
+    plt.plot(x, polynomial(x), label='Polynomial Fit', color='red')
+    plt.scatter(next_x, predicted_y, color='green', s=100, label='Prediction')
+    plt.title(f"{symbol} - Polynomial Regression (degree={degree})")
+    plt.xlabel("Days")
+    plt.ylabel("Price")
+    plt.legend()
+    plt.grid()
+    plt.show()
+    return predicted_y[0]
