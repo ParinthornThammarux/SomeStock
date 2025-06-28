@@ -36,10 +36,10 @@ class MainWindow(QMainWindow):
         # Grid buttons
         grid_layout = QGridLayout()
 
-        self.open_second_btn = QPushButton("ไปหน้าที่สอง")
+        self.open_second_btn = QPushButton("Search Stock")
         self.open_third_btn = QPushButton("Manage")
         self.open_forth_btn = QPushButton("Prediction Mode")
-        self.open_zero_btn = QPushButton("TEST")
+        self.open_zero_btn = QPushButton("Comparison")
 
         self.open_second_btn.clicked.connect(self.open_Dashboard_page)
         self.open_third_btn.clicked.connect(self.open_Manage_window)
