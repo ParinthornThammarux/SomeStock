@@ -245,7 +245,7 @@ def predict_MACD(symbol):
 
     return latest_macd, latest_signal
 
-def predict_price_polynomial(symbol , degree=2):
+def predict_price_binomial(symbol):
     
     data = yf.Ticker(symbol).history(period="1y").dropna()  # ดึงข้อมูลย้อนหลัง 1 ปีและลบค่า NaN
     data = data.reset_index()
@@ -253,7 +253,7 @@ def predict_price_polynomial(symbol , degree=2):
     y = data['Close'].values
     x = np.arange(len(y))
 
-    coefficients = np.polyfit(x, y, degree)
+    coefficients = np.polyfit(x, y, 2)
     polynomial = np.poly1d(coefficients)
 
     next_x = np.array([len(y)])  # วันถัดไป
@@ -263,7 +263,7 @@ def predict_price_polynomial(symbol , degree=2):
     plt.plot(x, y, label='Actual Price', color='blue')
     plt.plot(x, polynomial(x), label='Polynomial Fit', color='red')
     plt.scatter(next_x, predicted_y, color='green', s=100, label='Prediction')
-    plt.title(f"{symbol} - Polynomial Regression (degree={degree})")
+    plt.title(f"{symbol} - Polynomial Regression (degree={2})")
     plt.xlabel("Days")
     plt.ylabel("Price")
     plt.legend()

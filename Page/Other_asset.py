@@ -30,23 +30,38 @@ class OtherAssetWindow(QMainWindow):
 
         # select index
         self.combo = QComboBox()
-        self.combo.addItems(["^GSPC", "^HSI", "^DJI"])
+        self.combo.addItems(["^GSPC", "^HSI", "^DJI","^SET.BK"])
         self.combo.setPlaceholderText("Select an index")
         self.layout.addWidget(self.combo)
         input_frame.setLayout(input_layout)
         self.layout.addWidget(input_frame)
-        # make button
-        self.search_button = QPushButton("🔍 ค้นหา")
-        self.search_button.clicked.connect(self.fetch_asset)
-        self.layout.addWidget(self.search_button)
+        
         # ---------- Output Console ----------
         self.result_text = QTextEdit()
         self.result_text.setReadOnly(True)
         self.layout.addWidget(self.result_text)
+        # make button
+        self.search_button = QPushButton("🔍 ค้นหา")
+        self.search_button.clicked.connect(self.fetch_asset)
+        self.layout.addWidget(self.search_button)
+
+        #back to main button
+        back_to_main_btn = QPushButton("กลับไปหน้าหลัก")
+        back_to_main_btn.clicked.connect(self.open_Main_window)
+        self.layout.addWidget(back_to_main_btn)
+        self.Main_window = None
 
     def fetch_asset(self):
         symbol = self.combo.currentText().strip()
         success = fetch_other_asset(symbol)
         self.result_text.clear()
         self.result_text.append(success.to_string())
+        
+        
+    def open_Main_window(self):
+        from main import MainWindow
+        if self.Main_window is None:
+            self.Main_window = MainWindow()
+        self.Main_window.show()
+        self.hide()
         

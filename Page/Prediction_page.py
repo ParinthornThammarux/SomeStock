@@ -31,7 +31,7 @@ class PredictionWindow(QMainWindow):
         left_layout.addWidget(self.label_input)
 
         self.combo = QComboBox()
-        self.combo.addItems(["RSI", "PricePrediction","Polynomial Prediction", "Hammer search", "Doji search", "EMA Cross", "PEG Ratio", "MACD"])
+        self.combo.addItems(["RSI", "PricePrediction","Binomial Prediction", "Hammer search", "Doji search", "EMA Cross", "PEG Ratio", "MACD"])
         self.combo.setPlaceholderText("Select an option")
         left_layout.addWidget(self.combo)
 
@@ -99,8 +99,8 @@ class PredictionWindow(QMainWindow):
             success = Prediction.predict_peg_ratio(symbol)
         elif option == "MACD":
             success = Prediction.predict_MACD(symbol)
-        elif option == "Polynomial Prediction":
-            success = Prediction.predict_price_polynomial(symbol)
+        elif option == "Binomial Prediction":
+            success = Prediction.predict_price_binomial(symbol)
         else:
             success = "Invalid Option"
 
