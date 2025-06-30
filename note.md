@@ -7,6 +7,7 @@ requir lib
 5. scikit-learn
 6. TA-lib
 7. bs4
+8. pytorch
 ✅ ❌ ❗️
 **ADDITIONAL-Requirement**
 1. Favorite System and sub fav ❗️

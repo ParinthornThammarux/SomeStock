@@ -7,62 +7,108 @@ import talib
 import matplotlib.pyplot as plt
 import mplfinance as mpf
 import requests
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
 from bs4 import BeautifulSoup
 
-trained_models = {}
+# ==================== Dataset ====================
+class StockDataset(Dataset):
+    def __init__(self, prices, window_size=10):
+        self.X, self.y = [], []
+        for i in range(len(prices) - window_size):
+            self.X.append(prices[i:i + window_size])
+            self.y.append(prices[i + window_size])
+        self.X = np.array(self.X, dtype=np.float32)
+        self.y = np.array(self.y, dtype=np.float32).reshape(-1, 1)
 
+    def __len__(self):
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.y[idx]
+
+# ==================== PyTorch Model ====================
+class StockPriceModel(nn.Module):
+    def __init__(self, input_size):
+        super(StockPriceModel, self).__init__()
+        self.net = nn.Sequential(
+            nn.Linear(input_size, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, 1)
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+# ==================== Fetch Data ====================
 def fetch_data(symbol, period="1y"):
-    data = yf.Ticker(symbol).history(period=period).dropna()
-    data = data.reset_index()
-    return data
+    data = yf.Ticker(symbol).history(period=period)
+    return data['Close'].dropna().values
 
-# ==================== Linear Regression Model with Save/Load ====================
-def train_linear_model(symbol, data):
-    X = np.arange(len(data)).reshape(-1, 1)
-    y = data['Close'].values
-    model = LinearRegression()
-    model.fit(X, y)
-    
-    # Save model to file
-    model_filename = os.path.join("Model", f"{symbol}_linear_model.pkl")
-    joblib.dump(model, model_filename)
-    print(f"💾 Saved Linear Regression model to {model_filename}")
-    
-    trained_models[symbol] = model
+# ==================== Train Model ====================
+def train_model(symbol, window_size=10, epochs=100):
+    prices = fetch_data(symbol)
+    dataset = StockDataset(prices, window_size)
+    loader = DataLoader(dataset, batch_size=16, shuffle=True)
+
+    model = StockPriceModel(window_size)
+    criterion = nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+    for epoch in range(epochs):
+        for x_batch, y_batch in loader:
+            pred = model(x_batch)
+            loss = criterion(pred, y_batch)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+    os.makedirs("Model", exist_ok=True)
+    model_path = f"Model/{symbol}_model.pt"
+    torch.save(model.state_dict(), model_path)
+    print(f"✅ Model saved to {model_path}")
     return model
 
-def load_linear_model(symbol):
-    model_filename = os.path.join("Model", f"{symbol}_linear_model.pkl")
-    if os.path.exists(model_filename):
-        model = joblib.load(model_filename)
-        trained_models[symbol] = model
-        print(f"📂 Loaded Linear Regression model from {model_filename}")
+# ==================== Load Model ====================
+def load_model(symbol, window_size=10):
+    model = StockPriceModel(window_size)
+    model_path = f"Model/{symbol}_model.pt"
+    if os.path.exists(model_path):
+        model.load_state_dict(torch.load(model_path))
+        model.eval()
+        print(f"📂 Loaded model from {model_path}")
         return model
     return None
 
-def predict_next_price(symbol):
-    data = fetch_data(symbol)
-    model = load_linear_model(symbol)
+# ==================== Predict Next Price ====================
+def predict_next_price(symbol, window_size=10):
+    prices = fetch_data(symbol)
+    model = load_model(symbol, window_size)
     if model is None:
-        model = train_linear_model(symbol, data)
+        model = train_model(symbol, window_size)
 
-    next_day = np.array([[len(data)]])
-    predicted_price = model.predict(next_day)[0]
+    recent_prices = prices[-window_size:]
+    input_tensor = torch.tensor(recent_prices, dtype=torch.float32).unsqueeze(0)
+    with torch.no_grad():
+        predicted = model(input_tensor).item()
 
-    print(f"📈 {symbol} - Predicted next close price: ${predicted_price:.2f}")
+    print(f"📈 {symbol} - Predicted next close price: ${predicted:.2f}")
 
-    # Plot actual prices and trend line
-    plt.plot(np.arange(len(data)), data['Close'], label='Actual Price')
-    plt.plot(np.arange(len(data)), model.predict(np.arange(len(data)).reshape(-1,1)), label='Trend Line')
-    plt.scatter(next_day, predicted_price, color='red', label='Predicted Price')
-    plt.title(f"{symbol} - Linear Regression Forecast")
+    plt.plot(np.arange(len(prices)), prices, label='Actual Price')
+    plt.scatter(len(prices), predicted, color='red', label='Predicted Price')
+    plt.title(f"{symbol} - PyTorch Forecast")
     plt.xlabel("Days")
     plt.ylabel("Price")
     plt.legend()
     plt.grid()
+    plt.tight_layout()
     plt.show()
 
-    return predicted_price
+    return predicted
 
 # ==================== RSI Prediction ====================
 def predict_rsi(symbol):
