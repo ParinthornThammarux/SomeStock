@@ -9,7 +9,7 @@ requir lib
 7. bs4
 ✅ ❌ ❗️
 **ADDITIONAL-Requirement**
-1. Favorite System ✅
+1. Favorite System and sub fav ❗️
 2. Time Range
 3. Additional Indicator ✅
 4. excel support ❗️

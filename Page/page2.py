@@ -37,8 +37,13 @@ class SecondWindow(QMainWindow):
         input_layout.addWidget(self.ticker_entry)
 
         self.combo = QComboBox()
-        self.combo.addItems(["rawdata", "price", "EMA"])
+        self.combo.addItems(["rawdata", "price", "EMA","Statement"])
         input_layout.addWidget(self.combo)
+
+        # ---------- Result Display ----------
+        self.result_text = QTextEdit(self.central_widget)
+        self.result_text.setReadOnly(True)
+        self.layout.addWidget(self.result_text)
 
         self.search_button = QPushButton("🔍 ค้นหา")
         self.search_button.clicked.connect(self.search)
@@ -59,19 +64,14 @@ class SecondWindow(QMainWindow):
         back_to_main_btn.clicked.connect(self.open_Main_window)
         self.layout.addWidget(back_to_main_btn)
         #make back function
+
         self.Main_window = None
     def open_Main_window(self):
         from main import MainWindow
         if self.Main_window is None:
             self.Main_window = MainWindow()
         self.Main_window.show()
-        self.hide()
-
-        # ---------- Result Display ----------
-        self.result_text = QTextEdit()
-        self.result_text.setReadOnly(True)
-        self.layout.addWidget(self.result_text)
-
+        self.hide() 
         # ---------- Load Style ----------
         stylesheet = self.load_stylesheet("InSide.qss")
         self.setStyleSheet(stylesheet)
@@ -86,7 +86,7 @@ class SecondWindow(QMainWindow):
     def search(self):
         name = self.ticker_entry.text().strip()
         select_option = self.combo.currentText()
-        # self.result_text.clear()
+        self.result_text.clear()
 
         if not name:
             self.result_text.setText("⚠️ กรุณากรอกชื่อหุ้น")
@@ -98,6 +98,8 @@ class SecondWindow(QMainWindow):
             result = StockFetch.fetch_rawdata(name)
         elif select_option == "EMA":
             result = StockFetch.calculate_MA(name)
+        elif select_option == "Statement":
+            result = StockFetch.financial_data(name)
         else:
             result = None
 
@@ -107,14 +109,6 @@ class SecondWindow(QMainWindow):
             except AttributeError:
                 result_str = str(result)
             self.result_text.setText(result_str)
-
-            # แสดงผลตรงกลางด้วย cursor
-            cursor = self.result_text.textCursor()
-            cursor.select(QTextCursor.Document)
-            self.result_text.setTextCursor(cursor)
-            self.result_text.setAlignment(Qt.AlignCenter)
-        else:
-            self.result_text.setText("❌ ไม่สามารถดึงข้อมูลหุ้นได้")
 
     # ---------- Export to PDF ----------
     def export_to_pdf(self):

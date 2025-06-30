@@ -1,42 +1,59 @@
+import os
+import joblib
 from sklearn.linear_model import LinearRegression
-import matplotlib.pyplot as plt
 import yfinance as yf
 import numpy as np
 import talib
+import matplotlib.pyplot as plt
 import mplfinance as mpf
 import requests
 from bs4 import BeautifulSoup
-from Fetch import Manage_FAV
 
-# For load favorite stock
-def load_fav():
-    filename = 'favorite_stocks.json'
-    favfile = Manage_FAV.loadfave()
+trained_models = {}
 
-def predict_next_price(symbol):
-    data = yf.Ticker(symbol).history(period="1y").dropna()  # ดึงข้อมูลย้อนหลัง 1 ปีและลบค่า NaN
-
-    # ใช้เฉพาะราคาปิด (Close)
+def fetch_data(symbol, period="1y"):
+    data = yf.Ticker(symbol).history(period=period).dropna()
     data = data.reset_index()
-    data['Day'] = np.arange(len(data))  # สร้างตัวแปร x = วัน
-    X = data[['Day']]
-    y = data['Close']
+    return data
 
-    # สร้างและฝึกโมเดล Linear Regression
+# ==================== Linear Regression Model with Save/Load ====================
+def train_linear_model(symbol, data):
+    X = np.arange(len(data)).reshape(-1, 1)
+    y = data['Close'].values
     model = LinearRegression()
     model.fit(X, y)
+    
+    # Save model to file
+    model_filename = os.path.join("Model", f"{symbol}_linear_model.pkl")
+    joblib.dump(model, model_filename)
+    print(f"💾 Saved Linear Regression model to {model_filename}")
+    
+    trained_models[symbol] = model
+    return model
 
-    # ทำนายราคาวันถัดไป
-    #plot จากราคาย้อนหลัง
+def load_linear_model(symbol):
+    model_filename = os.path.join("Model", f"{symbol}_linear_model.pkl")
+    if os.path.exists(model_filename):
+        model = joblib.load(model_filename)
+        trained_models[symbol] = model
+        print(f"📂 Loaded Linear Regression model from {model_filename}")
+        return model
+    return None
+
+def predict_next_price(symbol):
+    data = fetch_data(symbol)
+    model = load_linear_model(symbol)
+    if model is None:
+        model = train_linear_model(symbol, data)
+
     next_day = np.array([[len(data)]])
     predicted_price = model.predict(next_day)[0]
 
-    # แสดงผล
     print(f"📈 {symbol} - Predicted next close price: ${predicted_price:.2f}")
 
-    # วาดกราฟ
-    plt.plot(data['Day'], y, label='Actual Price')
-    plt.plot(data['Day'], model.predict(X), label='Trend Line')
+    # Plot actual prices and trend line
+    plt.plot(np.arange(len(data)), data['Close'], label='Actual Price')
+    plt.plot(np.arange(len(data)), model.predict(np.arange(len(data)).reshape(-1,1)), label='Trend Line')
     plt.scatter(next_day, predicted_price, color='red', label='Predicted Price')
     plt.title(f"{symbol} - Linear Regression Forecast")
     plt.xlabel("Days")
@@ -46,18 +63,17 @@ def predict_next_price(symbol):
     plt.show()
 
     return predicted_price
-def predict_rsi(symbol):
-    data = yf.Ticker(symbol).history(period="1y").dropna()  # ดึงข้อมูลย้อนหลัง 1 ปีและลบค่า NaN
 
-    # คำนวณ RSI
+# ==================== RSI Prediction ====================
+def predict_rsi(symbol):
+    data = fetch_data(symbol)
     data['RSI'] = talib.RSI(data['Close'], timeperiod=14)
 
-    # แสดงผล RSI ล่าสุด
     latest_rsi = data['RSI'].iloc[-1]
     print(f"📈 {symbol} - Latest RSI: {latest_rsi:.2f}")
-    # วาดกราฟ RSI
+
     plt.figure(figsize=(10, 5))
-    plt.plot(data.index, data['RSI'], label='RSI', color='purple')
+    plt.plot(data['Date'], data['RSI'], label='RSI', color='purple')
     plt.axhline(70, color='red', linestyle='--', label='Overbought (70)')
     plt.axhline(30, color='green', linestyle='--', label='Oversold (30)')
     plt.title(f"{symbol} - RSI (14)")
@@ -69,14 +85,13 @@ def predict_rsi(symbol):
     plt.show()
 
     return latest_rsi
-#ตรวจหา Hammer Candlestick
-def detect_hammer(symbol):
-    data = yf.Ticker(symbol).history(period="1y").dropna()
 
-    # คำนวณ Hammer Candlestick
+# ==================== Hammer Candlestick Detection ====================
+def detect_hammer(symbol):
+    data = fetch_data(symbol)
+    data.set_index('Date', inplace=True)
     data['Hammer'] = talib.CDLHAMMER(data['Open'], data['High'], data['Low'], data['Close'])
 
-    # กรองแถวที่มี Hammer
     hammer_days = data[data['Hammer'] != 0]
 
     if not hammer_days.empty:
@@ -86,9 +101,7 @@ def detect_hammer(symbol):
     else:
         print(f"📈 {symbol} - No Hammer detected in the last year.")
 
-    # สร้างกราฟ candlestick โดยใช้ mplfinance และไฮไลต์ Hammer
-    add_plot = mpf.make_addplot(data['Hammer'].apply(lambda x: data['Low'].min() if x != 0 else None),
-                                type='scatter', markersize=100, marker='v', color='red')
+    add_plot = mpf.make_addplot(hammer_days['Low'], type='scatter', markersize=100, marker='v', color='red')
     mpf.plot(
         data,
         type='candle',
@@ -104,14 +117,12 @@ def detect_hammer(symbol):
 
     return hammer_days
 
-#ตรวจหา Doji Candlestick
+# ==================== Doji Candlestick Detection ====================
 def detect_doji(symbol):
-    data = yf.Ticker(symbol).history(period="1y").dropna()
-
-    # คำนวณ Doji Candlestick
+    data = fetch_data(symbol)
+    data.set_index('Date', inplace=True)
     data['Doji'] = talib.CDLDOJI(data['Open'], data['High'], data['Low'], data['Close'])
 
-    # กรองแถวที่มี Doji
     doji_days = data[data['Doji'] != 0]
 
     if not doji_days.empty:
@@ -121,9 +132,7 @@ def detect_doji(symbol):
     else:
         print(f"📈 {symbol} - No Doji detected in the last year.")
 
-    # สร้างกราฟ candlestick โดยใช้ mplfinance และไฮไลต์ Doji
-    add_plot = mpf.make_addplot(data['Doji'].apply(lambda x: data['Low'].min() if x != 0 else None),
-                                type='scatter', markersize=100, marker='v', color='blue')
+    add_plot = mpf.make_addplot(doji_days['Low'], type='scatter', markersize=100, marker='v', color='blue')
     mpf.plot(
         data,
         type='candle',
@@ -139,38 +148,34 @@ def detect_doji(symbol):
 
     return doji_days
 
-#ตรวจหา EMA Cross
+# ==================== EMA Cross Detection ====================
 def detect_ema_cross(symbol):
-    data = yf.Ticker(symbol).history(period="1y").dropna()
+    data = fetch_data(symbol)
+    data.set_index('Date', inplace=True)
 
-    # คำนวณ EMA
     data['EMA_12'] = talib.EMA(data['Close'], timeperiod=12)
     data['EMA_26'] = talib.EMA(data['Close'], timeperiod=26)
 
-    # คำนวณสัญญาณ Cross
     data['Signal'] = np.where(data['EMA_12'] > data['EMA_26'], 1, 0)
-    data['Cross'] = np.diff(np.insert(data['Signal'], 0, 0))  # คำนวณ cross ที่เปลี่ยนจาก 0 เป็น 1 หรือ 1 เป็น 0
+    data['Cross'] = data['Signal'].diff()
 
-    # กรองวันที่เกิด cross
     cross_days = data[data['Cross'] != 0]
 
     if not cross_days.empty:
         print(f"📈 {symbol} - EMA Cross detected on:")
         for date in cross_days.index:
-            cross_type = "Bullish Cross (12 > 26)" if data.loc[date, 'Cross'] == 1 else "Bearish Cross (12 < 26)"
+            cross_type = "Bullish Cross (12 > 26)" if cross_days.loc[date, 'Cross'] == 1 else "Bearish Cross (12 < 26)"
             print(f"  - {date.date()}: {cross_type}")
     else:
         print(f"📉 {symbol} - No EMA Cross in the last year.")
 
-    # วาดกราฟ
     plt.figure(figsize=(14, 7))
     plt.plot(data.index, data['Close'], label='Close Price', alpha=0.3)
     plt.plot(data.index, data['EMA_12'], label='EMA 12', color='blue')
     plt.plot(data.index, data['EMA_26'], label='EMA 26', color='orange')
 
-    # Plot จุด Cross
-    bullish = data[data['Cross'] == 1]
-    bearish = data[data['Cross'] == -1]
+    bullish = cross_days[cross_days['Cross'] == 1]
+    bearish = cross_days[cross_days['Cross'] == -1]
     plt.scatter(bullish.index, bullish['Close'], marker='^', color='green', label='Bullish Cross', s=100)
     plt.scatter(bearish.index, bearish['Close'], marker='v', color='red', label='Bearish Cross', s=100)
 
@@ -184,8 +189,7 @@ def detect_ema_cross(symbol):
 
     return cross_days
 
-#ตรวจหา PEG Ratio
-
+# ==================== PEG Ratio Prediction ====================
 def predict_peg_ratio(symbol):
     url = f"https://finviz.com/quote.ashx?t={symbol}"
     headers = {"User-Agent": "Mozilla/5.0"}
@@ -201,20 +205,26 @@ def predict_peg_ratio(symbol):
         cells = row.find_all("td")
         for i in range(0, len(cells), 2):
             if cells[i].text == "PEG":
-                print(float(cells[i+1].text))
-                return float(cells[i+1].text)
+                peg = cells[i+1].text
+                try:
+                    peg_value = float(peg)
+                    print(f"📊 {symbol} - PEG Ratio: {peg_value}")
+                    return peg_value
+                except ValueError:
+                    print(f"⚠️ PEG Ratio not available or invalid: {peg}")
+                    return None
     return None
 
+# ==================== MACD Prediction ====================
 def predict_MACD(symbol):
-    data = yf.Ticker(symbol).history(period="1y").dropna()
+    data = fetch_data(symbol)
+    data.set_index('Date', inplace=True)
 
-    # Calculate MACD and Signal Line
     macd, macd_signal, macd_hist = talib.MACD(data['Close'], fastperiod=12, slowperiod=26, signalperiod=9)
     data['MACD'] = macd
     data['Signal'] = macd_signal
     data['Hist'] = macd_hist
 
-    # Plot MACD and Signal Line
     plt.figure(figsize=(14, 7))
     plt.plot(data.index, data['MACD'], label='MACD', color='blue')
     plt.plot(data.index, data['Signal'], label='Signal Line', color='red')
@@ -227,12 +237,10 @@ def predict_MACD(symbol):
     plt.tight_layout()
     plt.show()
 
-    # Show latest values
     latest_macd = data['MACD'].iloc[-1]
     latest_signal = data['Signal'].iloc[-1]
     print(f"📈 {symbol} - Latest MACD: {latest_macd:.2f}, Signal Line: {latest_signal:.2f}")
 
-    # Determine crossover signal
     prev_macd = data['MACD'].iloc[-2]
     prev_signal = data['Signal'].iloc[-2]
 
@@ -245,28 +253,49 @@ def predict_MACD(symbol):
 
     return latest_macd, latest_signal
 
+# ==================== Polynomial Regression Prediction ====================
 def predict_price_binomial(symbol):
-    
-    data = yf.Ticker(symbol).history(period="1y").dropna()  # ดึงข้อมูลย้อนหลัง 1 ปีและลบค่า NaN
-    data = data.reset_index()
-
+    data = fetch_data(symbol)
     y = data['Close'].values
     x = np.arange(len(y))
 
     coefficients = np.polyfit(x, y, 2)
     polynomial = np.poly1d(coefficients)
 
-    next_x = np.array([len(y)])  # วันถัดไป
+    next_x = np.array([len(y)])
     predicted_y = polynomial(next_x)
     print(f"📈 {symbol} - Predicted next close price using polynomial regression: ${predicted_y[0]:.2f}")
+
     plt.figure(figsize=(10, 5))
     plt.plot(x, y, label='Actual Price', color='blue')
     plt.plot(x, polynomial(x), label='Polynomial Fit', color='red')
     plt.scatter(next_x, predicted_y, color='green', s=100, label='Prediction')
-    plt.title(f"{symbol} - Polynomial Regression (degree={2})")
+    plt.title(f"{symbol} - Polynomial Regression (degree=2)")
     plt.xlabel("Days")
     plt.ylabel("Price")
     plt.legend()
     plt.grid()
     plt.show()
     return predicted_y[0]
+
+# ==================== Momentum Prediction ====================
+def predict_momentum(symbol):
+    data = fetch_data(symbol)
+    data.set_index('Date', inplace=True)
+    data['Momentum'] = talib.MOM(data['Close'], timeperiod=10)
+
+    latest_momentum = data['Momentum'].iloc[-1]
+    print(f"📈 {symbol} - Latest Momentum: {latest_momentum:.2f}")
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(data.index, data['Momentum'], label='Momentum', color='purple')
+    plt.axhline(0, color='black', linestyle='--', label='Zero Line')
+    plt.title(f"{symbol} - Momentum (10)")
+    plt.xlabel("Date")
+    plt.ylabel("Momentum")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    return latest_momentum

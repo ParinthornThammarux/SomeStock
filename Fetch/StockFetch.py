@@ -43,3 +43,19 @@ def fetch_rawdata(ticker):
     except Exception as e:
         print(f"Error fetching data: {e}")
         return None
+def financial_data(ticker):
+    try:
+        stock = yf.Ticker(ticker)
+        # info = stock.info
+        financials = stock.financials
+        balance_sheet = stock.balance_sheet
+        cashflow = stock.cashflow
+        return {
+            # "info": info,
+            "financials": financials,
+            "balance_sheet": balance_sheet,
+            "cashflow": cashflow
+        }
+    except Exception as e:
+        print(f"Error fetching financial data: {e}")
+        return None
