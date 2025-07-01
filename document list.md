@@ -1,5 +1,0 @@
-1. Pyside6 ==> [text](https://pyside.readthedocs.io/en/latest/)
-2. yfinance ==> [text](https://ranaroussi.github.io/yfinance/reference/index.html)
-3. pandas ==> [text](https://pandas.pydata.org/docs/)
-4. matplotlib ==> [text](https://matplotlib.org/)
-5. scikit-learn ==> [text](https://scikit-learn.org/stable/)
