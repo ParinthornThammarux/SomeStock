@@ -6,7 +6,7 @@ import dearpygui.dearpygui as dpg
 from pages.welcome_page import create_welcome_content
 from pages.example_page_b import create_example_page_b_content
 from components.graph_dpg import create_main_graph
-from containers.graph_tabs_container import create_graph_tabs
+from containers.container_graph_tabs import create_graph_tabs
 
 # Global variable to track current page
 current_page = "welcome"

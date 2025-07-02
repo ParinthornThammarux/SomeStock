@@ -1,6 +1,6 @@
 # containers/graph_tabs_container.py
 
-# This acts as a container for all the graph types tabs
+# This acts as a container for all the graph types tabs 
 
 import dearpygui.dearpygui as dpg
 import random
@@ -133,7 +133,7 @@ def refresh_enhanced_page(parent_tag):
     """Refresh the entire enhanced page"""
     try:
         print("Refreshing enhanced page...")
-        from .content_container import show_page
+        from .container_content import show_page
         show_page("enhanced")
     except Exception as e:
         print(f"Error refreshing enhanced page: {e}")

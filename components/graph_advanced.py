@@ -18,13 +18,13 @@ def create_advanced_analysis_tab(parent_tag, timestamp):
     # Control buttons
     with dpg.group(horizontal=True):
         dpg.add_button(
-            label="📊 Generate Advanced Charts",
+            label="Generate Advanced Charts",
             callback=lambda: generate_advanced_charts(parent_tag, timestamp),
             width=250, height=40
         )
         dpg.add_spacer(width=20)
         dpg.add_button(
-            label="📈 Timeframe Analysis",
+            label="Timeframe Analysis",
             callback=lambda: generate_timeframe_analysis(parent_tag, timestamp),
             width=200, height=40
         )

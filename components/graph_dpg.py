@@ -161,6 +161,8 @@ def create_main_graph(parent_tag, timestamp=None):
         with dpg.group(horizontal=True):
             dpg.add_button(label="Refresh Data", callback=refresh_data, width=120)
             dpg.add_spacer(width=10)
+            dpg.add_button(label="TSLA Data", callback=refresh_data_from_stockdx_button, width=120)
+            dpg.add_spacer(width=10)
             dpg.add_button(label="Export CSV", callback=export_data, width=120)
             dpg.add_spacer(width=10)
             dpg.add_button(label="Back to Welcome", callback=go_to_welcome, width=150)
@@ -196,6 +198,56 @@ def refresh_data():
     else:
         print("Graph not found for refresh")
 
+def refresh_data_from_stockdx_button(user_data):
+    """Button callback wrapper for stockdx data"""
+    refresh_data_from_stockdx("TSLA")
+    
+# In your graph_dpg.py, modify the refresh function:
+def refresh_data_from_stockdx(symbol="TSLA"):
+    """Refresh graph with real stockdx data - improved version"""
+    try:
+        print(f"Fetching real data for {symbol}...")
+        from stockdex import Ticker
+        
+        ticker = Ticker(ticker=symbol)
+        df = ticker.yahoo_api_price(range='1d', dataGranularity='5m')
+        
+        if df is not None and not df.empty:
+            # Convert to DPG format
+            x_data = list(range(len(df)))
+            y_data = df['close'].tolist()
+            
+            # Update existing line series
+            global current_stock_line_tag
+            if current_stock_line_tag and dpg.does_item_exist(current_stock_line_tag):
+                dpg.set_value(current_stock_line_tag, [x_data, y_data])
+                
+                # Update axis limits to fit new data
+                if len(y_data) > 0:
+                    min_price = min(y_data) * 0.98  # Add some padding
+                    max_price = max(y_data) * 1.02
+                    
+                    # Find the axis tags (you might need to store these globally too)
+                    # For now, let's try to find them dynamically
+                    for item in dpg.get_all_items():
+                        if dpg.get_item_type(item) == "mvAppItemType::mvPlotAxis":
+                            if "y_axis" in str(item):
+                                dpg.set_axis_limits(item, min_price, max_price)
+                            elif "x_axis" in str(item):
+                                dpg.set_axis_limits(item, 0, len(x_data))
+                
+                print(f"✅ Updated chart with real {symbol} data! ({len(df)} points)")
+                print(f"   Current price: ${y_data[-1]:.2f}")
+            else:
+                print("❌ Chart line series not found")
+        else:
+            print(f"⚠️ No data returned for {symbol}")
+            
+    except ImportError:
+        print("❌ stockdx library not available")
+    except Exception as e:
+        print(f"❌ Error updating with real data: {e}")
+
 def export_data():
     """Simulate data export"""
     print("Exporting portfolio data to CSV...")
@@ -204,7 +256,7 @@ def export_data():
 def go_to_welcome():
     """Go back to welcome page"""
     print("Going back to welcome page")
-    from containers.content_container import show_page
+    from containers.container_content import show_page
     show_page("welcome")
 
 # Keep the old function for backward compatibility
