@@ -1,4 +1,4 @@
-# components/main_graph_page.py
+# components/graph_dpg.py
 
 import dearpygui.dearpygui as dpg
 import math
@@ -9,7 +9,7 @@ from utils import constants
 # Global variable to track current stock line tag
 current_stock_line_tag = None
 
-def create_main_graph(parent_tag):
+def create_main_graph(parent_tag, timestamp=None):
     """
     Creates a content page with a graph on top and a table below with demo data.
     Simplified approach to avoid tag conflicts.
@@ -17,7 +17,8 @@ def create_main_graph(parent_tag):
     print(f"Creating graph and table content in parent: {parent_tag}")
     
     # Create unique identifier for this instance
-    timestamp = str(int(time.time() * 1000))
+    if timestamp is None:
+        timestamp = str(int(time.time() * 1000))
     
     # Create a main container with proper height management
     main_container_tag = f"main_container_{timestamp}"
@@ -198,7 +199,7 @@ def export_data():
 def go_to_welcome():
     """Go back to welcome page"""
     print("Going back to welcome page")
-    from .content_container import show_page
+    from ..containers.content_container import show_page
     show_page("welcome")
 
 # Keep the old function for backward compatibility

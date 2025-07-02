@@ -42,7 +42,7 @@ def create_example_page_b_content(parent_tag):
 def go_to_welcome():
     """Go back to welcome page"""
     print("Going back to welcome page")
-    from .content_container import show_page
+    from ..containers.content_container import show_page
     show_page("welcome")
 
 # Keep the old function for backward compatibility

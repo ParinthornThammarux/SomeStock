@@ -3,7 +3,7 @@
 import dearpygui.dearpygui as dpg
 import time
 from components.sidebar import create_sidebar
-from pages.content_container import create_main_content, show_page  # Import the new show_page
+from containers.content_container import create_main_content, show_page  # Import the new show_page
 from utils import constants
 
 # --- Animation State Variables ---

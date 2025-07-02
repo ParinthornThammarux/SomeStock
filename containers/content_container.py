@@ -1,10 +1,12 @@
-# pages/content_container.py - Updated with enhanced charts
+# containers/content_container.py
+
+# Wraps everything on the right side (excluding sidebar) 
 
 import dearpygui.dearpygui as dpg
-from .welcome_page import create_welcome_content
-from .example_page_b import create_example_page_b_content
-from .main_graph_page import create_main_graph
-from .enhanced_main_graph_page import create_enhanced_main_graph  # New import
+from pages.welcome_page import create_welcome_content
+from pages.example_page_b import create_example_page_b_content
+from components.graph_dpg import create_main_graph
+from containers.graph_tabs_container import create_graph_tabs
 
 # Global variable to track current page
 current_page = "welcome"
@@ -46,7 +48,7 @@ def show_page(page_name):
         create_main_graph("page_content_container")  # Original simple chart
         current_page = "main"
     elif page_name == "enhanced":  # New enhanced page
-        create_enhanced_main_graph("page_content_container")
+        create_graph_tabs("page_content_container")
         current_page = "enhanced"
     elif page_name == "page_b":
         create_example_page_b_content("page_content_container")

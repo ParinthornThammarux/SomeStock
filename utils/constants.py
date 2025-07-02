@@ -1,4 +1,4 @@
-# utils/constants.py
+# utils/constants.py - Updated with new chart icons
 
 import dearpygui.dearpygui as dpg
 import os
@@ -22,6 +22,15 @@ ICON_BOLT = "\uf0e7" # New icon for "AI" or "power"
 ICON_BARS = "\uf0c9" # Three line menu (hamburger menu)
 ICON_SEARCH = "\uf002" # Search/magnifying glass icon
 ICON_HEART = "\uf004"  # Font Awesome solid heart icon
+
+# New chart-specific icons
+ICON_CHART_LINE = "\uf201"  # Line chart icon for DPG charts
+ICON_CHART_AREA = "\uf1fe"  # Area chart icon for advanced analysis
+ICON_GLOBE = "\uf0ac"       # Globe icon for interactive charts
+ICON_EXCHANGE_ALT = "\uf362"  # Exchange/flow icon for Sankey analysis
+ICON_CALCULATOR = "\uf1ec"  # Calculator icon for analysis
+ICON_CHART_PIE = "\uf200"   # Pie chart icon
+ICON_ANALYTICS = "\uf643"   # Analytics icon (alternative)
 
 # --- Animation Parameters ---
 ANIMATION_DURATION = 0.2  # seconds
@@ -63,5 +72,3 @@ def load_fonts():
         else:
             print(f"Error: Font Awesome font file '{FONT_AWESOME_PATH}' not found.")
             print("Please download 'fa-solid-900.ttf' and place it in the script directory or update the FONT_AWESOME_PATH.")
-
-    dpg.bind_font(default_font_id)
