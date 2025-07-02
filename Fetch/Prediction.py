@@ -46,7 +46,8 @@ class StockPriceModel(nn.Module):
 # ==================== Fetch Data ====================
 def fetch_data(symbol, period="1y"):
     data = yf.Ticker(symbol).history(period=period)
-    return data['Close'].dropna().values
+    data.reset_index(inplace=True)
+    return data
 
 # ==================== Train Model ====================
 def train_model(symbol, window_size=10, epochs=100):
