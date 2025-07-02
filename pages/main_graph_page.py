@@ -3,72 +3,124 @@
 import dearpygui.dearpygui as dpg
 import math
 import random
+import time
+
+from utils import constants
+# Global variable to track current stock line tag
+current_stock_line_tag = None
 
 def create_main_graph(parent_tag):
     """
     Creates a content page with a graph on top and a table below with demo data.
+    Simplified approach to avoid tag conflicts.
     """
     print(f"Creating graph and table content in parent: {parent_tag}")
     
-    # Add some padding from the top
-    dpg.add_spacer(height=20, parent=parent_tag)
+    # Create unique identifier for this instance
+    timestamp = str(int(time.time() * 1000))
     
-    # Main container
-    with dpg.group(horizontal=False, parent=parent_tag):
-        dpg.add_text("Stock Analysis Dashboard", color=[255, 255, 255], parent=parent_tag)
-        dpg.add_separator(parent=parent_tag)
-        dpg.add_spacer(height=10, parent=parent_tag)
+    # Create a main container with proper height management
+    main_container_tag = f"main_container_{timestamp}"
+    with dpg.child_window(width=-1, height=-1, parent=parent_tag, tag=main_container_tag, no_scrollbar=False):
+        # Title
+        dpg.add_text("Stock Analysis Dashboard", color=[255, 255, 255])
+        dpg.add_separator()
+        dpg.add_spacer(height=10)
         
-        # TOP BOX - Graph
-        with dpg.child_window(width=-1, height=350, parent=parent_tag, tag="graph_container"):
-            dpg.add_text("Stock Price Chart", color=[200, 200, 255])
-            dpg.add_separator()
-            dpg.add_spacer(height=10)
-            
-            # Generate demo data for the graph
-            x_data = list(range(50))
-            y_data = []
-            base_price = 100
-            for i in range(50):
-                # Simulate stock price movement
-                change = random.uniform(-2, 2)
-                base_price += change
-                y_data.append(max(80, min(120, base_price)))  # Keep price between 80-120
-            
-            # Create the plot
-            with dpg.plot(label="Stock Price Over Time", height=280, width=-20):
-                dpg.add_plot_legend()
-                dpg.add_plot_axis(dpg.mvXAxis, label="Days", tag="x_axis")
-                dpg.add_plot_axis(dpg.mvYAxis, label="Price ($)", tag="y_axis")
-                
-                # Add the line series
-                dpg.add_line_series(x_data, y_data, label="AAPL Stock Price", parent="y_axis", tag="stock_line")
-                
-                # Set axis limits
-                dpg.set_axis_limits("x_axis", 0, 50)
-                dpg.set_axis_limits("y_axis", 80, 120)
+        # GRAPH SECTION - Fixed height container
+        dpg.add_text("Stock Price Chart", color=[200, 200, 255])
+        dpg.add_spacer(height=5)
         
-        dpg.add_spacer(height=10, parent=parent_tag)
+        # Generate demo data for the graph
+        x_data = list(range(50))
+        y_data = []
+        base_price = 100
+        for i in range(50):
+            change = random.uniform(-2, 2)
+            base_price += change
+            y_data.append(max(80, min(120, base_price)))
         
-        # BOTTOM BOX - Table
-        with dpg.child_window(width=-1, height=-50, parent=parent_tag, tag="table_container"):
-            dpg.add_text("Stock Portfolio Data", color=[200, 255, 200])
-            dpg.add_separator()
-            dpg.add_spacer(height=10)
+        # Create the plot with unique tags - FIXED HEIGHT APPROACH
+        plot_tag = f"plot_{timestamp}"
+        x_axis_tag = f"x_axis_{timestamp}"
+        y_axis_tag = f"y_axis_{timestamp}"
+        line_tag = f"stock_line_{timestamp}"
+        graph_container_tag = f"graph_container_{timestamp}"
+        
+        # Use a group to contain the plot with specific dimensions
+        with dpg.group():
+            with dpg.child_window(width=-1, height=250, tag=graph_container_tag, border=True):
+                with dpg.plot(label="", height=-1, width=-1, tag=plot_tag, no_title=True):
+                    dpg.add_plot_legend()
+                    dpg.add_plot_axis(dpg.mvXAxis, label="Days", tag=x_axis_tag)
+                    dpg.add_plot_axis(dpg.mvYAxis, label="Price ($)", tag=y_axis_tag)
+                    dpg.add_line_series(x_data, y_data, label="AAPL Stock Price", parent=y_axis_tag, tag=line_tag)
+                    dpg.set_axis_limits(x_axis_tag, 0, 50)
+                    dpg.set_axis_limits(y_axis_tag, 80, 120)
+    
+        # Store the line tag globally for refresh function
+        global current_stock_line_tag
+        current_stock_line_tag = line_tag
+        
+        # Small buttons below the graph this will also hold the tags for each stock
+        dpg.add_spacer(height=5)
+        with dpg.group(horizontal=True):
             
-            # Create table with demo data
-            with dpg.table(header_row=True, borders_innerH=True, borders_outerH=True, 
-                          borders_innerV=True, borders_outerV=True, tag="portfolio_table"):
-                
-                # Table headers
+            #Green theme
+            with dpg.theme(tag="green_button_theme"):
+                with dpg.theme_component(dpg.mvButton):
+                    dpg.add_theme_color(dpg.mvThemeCol_Button, [0, 128, 0, 255])        # Normal state - green
+                    dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, [0, 180, 0, 255]) # Hover state - lighter green
+                    dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, [0, 100, 0, 255])  # Clicked state - darker green
+            
+            #Red theme
+            with dpg.theme(tag="red_button_theme"):
+                with dpg.theme_component(dpg.mvButton):
+                    dpg.add_theme_color(dpg.mvThemeCol_Button, [128, 0, 0, 255])        # Normal state - red
+                    dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, [180, 0, 0, 255]) # Hover state - lighter red
+                    dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, [100, 0, 0, 255])  # Clicked state - darker red
+
+            dpg.add_button(tag="add_stock_button",label=constants.ICON_PLUS, width=30, height=30, callback=plus_button_callback)
+            dpg.bind_item_font("add_stock_button", constants.font_awesome_icon_font_id)
+            dpg.bind_item_theme("add_stock_button", "green_button_theme")
+            
+            # Heart button
+            dpg.add_button(tag="add_fav_stock_button",label=constants.ICON_HEART, width=30, height=30, callback=fav_button_callback)
+            dpg.bind_item_font("add_fav_stock_button", constants.font_awesome_icon_font_id)
+            dpg.bind_item_theme("add_fav_stock_button", "red_button_theme")
+
+
+        
+        dpg.add_spacer(height=20)
+        
+        # TABLE SECTION
+        dpg.add_text("Stock Portfolio Data", color=[200, 255, 200])
+        dpg.add_spacer(height=5)
+        
+        # Create table with unique tag - FIXED HEIGHT
+        table_tag = f"portfolio_table_{timestamp}"
+        table_container_tag = f"table_container_{timestamp}"
+        
+        with dpg.child_window(width=-1, height=-1, tag=table_container_tag, border=False):
+            with dpg.table(
+                header_row=True,
+                borders_innerH=True,
+                borders_outerH=True,
+                borders_innerV=True,
+                borders_outerV=True,
+                tag=table_tag,
+                height=-1,
+                scrollY=False
+            ):
+                # Table columns
                 dpg.add_table_column(label="Symbol", width_fixed=True, init_width_or_weight=80)
                 dpg.add_table_column(label="Company", width_fixed=True, init_width_or_weight=200)
                 dpg.add_table_column(label="Price", width_fixed=True, init_width_or_weight=100)
                 dpg.add_table_column(label="Change", width_fixed=True, init_width_or_weight=100)
-                dpg.add_table_column(label="Volume", width_fixed=True, init_width_or_weight=120)
-                dpg.add_table_column(label="Market Cap", width_fixed=True, init_width_or_weight=130)
+                dpg.add_table_column(label="Volume", width_fixed=True, init_width_or_weight=100)
+                dpg.add_table_column(label="Market Cap", width_fixed=True, init_width_or_weight=120)
                 
-                # Demo data rows
+                # Demo stock data
                 demo_stocks = [
                     ("AAPL", "Apple Inc.", 175.43, 2.15, "64.2M", "2.75T"),
                     ("GOOGL", "Alphabet Inc.", 2431.50, -15.23, "1.2M", "1.63T"),
@@ -82,34 +134,46 @@ def create_main_graph(parent_tag):
                     ("PYPL", "PayPal Holdings", 62.85, -1.78, "12.3M", "70.8B")
                 ]
                 
+                # Add table rows
                 for symbol, company, price, change, volume, market_cap in demo_stocks:
                     with dpg.table_row():
                         dpg.add_text(symbol)
                         dpg.add_text(company)
                         dpg.add_text(f"${price:.2f}")
                         
-                        # Color code the change (green for positive, red for negative)
+                        # Color-coded change
                         change_color = [0, 255, 0] if change >= 0 else [255, 0, 0]
-                        change_text = f"+${change:.2f}" if change >= 0 else f"-${abs(change):.2f}"
+                        change_text = f"+${change:.2f}" if change >= 0 else f"${change:.2f}"
                         dpg.add_text(change_text, color=change_color)
                         
                         dpg.add_text(volume)
                         dpg.add_text(market_cap)
         
-        # Add some action buttons at the bottom
-        dpg.add_spacer(height=10, parent=parent_tag)
-        with dpg.group(horizontal=True, parent=parent_tag):
+        # Action buttons
+        dpg.add_spacer(height=15)
+        
+        with dpg.group(horizontal=True):
             dpg.add_button(label="Refresh Data", callback=refresh_data, width=120)
             dpg.add_spacer(width=10)
             dpg.add_button(label="Export CSV", callback=export_data, width=120)
             dpg.add_spacer(width=10)
             dpg.add_button(label="Back to Welcome", callback=go_to_welcome, width=150)
 
+def plus_button_callback():
+    """Callback for the plus button"""
+    print("Plus button clicked!")
+    # Add your plus button functionality here
+
+def fav_button_callback():
+    """Callback for the heart button"""
+    print("Heart button clicked!")
+    # Add your heart button functionality here
+
 def refresh_data():
-    """Refresh the graph and table data"""
+    """Refresh the graph data"""
     print("Refreshing stock data...")
     
-    # Regenerate graph data
+    # Generate new data
     x_data = list(range(50))
     y_data = []
     base_price = random.uniform(90, 110)
@@ -119,16 +183,17 @@ def refresh_data():
         y_data.append(max(80, min(120, base_price)))
     
     # Update the line series
-    if dpg.does_item_exist("stock_line"):
-        dpg.set_value("stock_line", [x_data, y_data])
-    
-    print("Data refreshed!")
+    global current_stock_line_tag
+    if current_stock_line_tag and dpg.does_item_exist(current_stock_line_tag):
+        dpg.set_value(current_stock_line_tag, [x_data, y_data])
+        print("Graph data refreshed!")
+    else:
+        print("Graph not found for refresh")
 
 def export_data():
     """Simulate data export"""
     print("Exporting portfolio data to CSV...")
     # In a real application, you would export the table data to a CSV file
-    dpg.add_text("Data exported successfully!", color=[0, 255, 0], parent="table_container")
 
 def go_to_welcome():
     """Go back to welcome page"""
@@ -139,4 +204,4 @@ def go_to_welcome():
 # Keep the old function for backward compatibility
 def create_graph_table_page(parent_tag):
     """Legacy function - redirects to new system"""
-    return create_graph_table_content(parent_tag)
+    return create_main_graph(parent_tag)

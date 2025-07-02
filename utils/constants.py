@@ -4,7 +4,7 @@ import dearpygui.dearpygui as dpg
 import os
 from pathlib import Path
 
-VERSION = "v1.0.0 internal"
+VERSION = "v1.0.1 Graph demo"
 # --- Font Awesome Icon Setup ---
 # IMPORTANT: You need the Font Awesome Free font file 'fa-solid-900.ttf'.
 # Place it in the root directory of your project (your_project_folder/).
@@ -21,6 +21,7 @@ ICON_ARROW_RIGHT = "\uf061"
 ICON_BOLT = "\uf0e7" # New icon for "AI" or "power"
 ICON_BARS = "\uf0c9" # Three line menu (hamburger menu)
 ICON_SEARCH = "\uf002" # Search/magnifying glass icon
+ICON_HEART = "\uf004"  # Font Awesome solid heart icon
 
 # --- Animation Parameters ---
 ANIMATION_DURATION = 0.2  # seconds

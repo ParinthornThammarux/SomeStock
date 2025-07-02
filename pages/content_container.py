@@ -12,7 +12,7 @@ def create_main_content(parent_tag):
     """
     Creates the main content area with a single container that gets cleared and repopulated.
     """
-    with dpg.child_window(tag="content_window", width=-1, height=-1, parent=parent_tag):
+    with dpg.child_window(tag="content_window", width=-1, height=-1, parent=parent_tag,border=False):
         # Apply black background theme
         with dpg.theme(tag="content_window_black_bg_theme"):
             with dpg.theme_component(dpg.mvChildWindow):
