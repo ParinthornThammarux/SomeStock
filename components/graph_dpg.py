@@ -46,12 +46,12 @@ def create_main_graph(parent_tag, timestamp=None):
         
         # Use a group to contain the plot with specific dimensions
         with dpg.group():
-            with dpg.child_window(width=-1, height=280, tag=graph_container_tag, border=True):
+            with dpg.child_window(width=-1, height=300, tag=graph_container_tag, border=True):
                 with dpg.plot(label="", height=-1, width=-1, tag=plot_tag, no_title=True):
                     dpg.add_plot_legend()
                     dpg.add_plot_axis(dpg.mvXAxis, label="Days", tag=x_axis_tag)
                     dpg.add_plot_axis(dpg.mvYAxis, label="Price ($)", tag=y_axis_tag)
-                    dpg.add_line_series(x_data, y_data, label="AAPL Stock Price", parent=y_axis_tag, tag=line_tag)
+                    dpg.add_line_series(x_data, y_data, parent=y_axis_tag, tag=line_tag)
                     dpg.set_axis_limits(x_axis_tag, 0, 50)
                     dpg.set_axis_limits(y_axis_tag, 80, 120)
     
@@ -200,11 +200,10 @@ def refresh_data():
 
 def refresh_data_from_stockdx_button(user_data):
     """Button callback wrapper for stockdx data"""
-    refresh_data_from_stockdx("TSLA")
-    
-# In your graph_dpg.py, modify the refresh function:
-def refresh_data_from_stockdx(symbol="TSLA"):
-    """Refresh graph with real stockdx data - improved version"""
+    fetch_data_from_stockdx("CPALL.BK")
+
+def fetch_data_from_stockdx(symbol):
+    """fetch graph with real stockdx data - simple debug plot"""
     try:
         print(f"Fetching real data for {symbol}...")
         from stockdex import Ticker
@@ -213,22 +212,27 @@ def refresh_data_from_stockdx(symbol="TSLA"):
         df = ticker.yahoo_api_price(range='1d', dataGranularity='5m')
         
         if df is not None and not df.empty:
-            # Convert to DPG format
+            print(f"✅ Retrieved {len(df)} data points for {symbol}")
+            print(f"Columns: {list(df.columns)}")
+            print(f"Index type: {type(df.index)}")
+            print(f"First row: {df.iloc[0]}")
+            print(f"Last row: {df.iloc[-1]}")
+            
+            # Convert to DPG format for the existing chart
             x_data = list(range(len(df)))
             y_data = df['close'].tolist()
             
-            # Update existing line series
+            # Update existing DPG line series
             global current_stock_line_tag
             if current_stock_line_tag and dpg.does_item_exist(current_stock_line_tag):
                 dpg.set_value(current_stock_line_tag, [x_data, y_data])
                 
                 # Update axis limits to fit new data
                 if len(y_data) > 0:
-                    min_price = min(y_data) * 0.98  # Add some padding
+                    min_price = min(y_data) * 0.98
                     max_price = max(y_data) * 1.02
                     
-                    # Find the axis tags (you might need to store these globally too)
-                    # For now, let's try to find them dynamically
+                    # Find and update axis limits
                     for item in dpg.get_all_items():
                         if dpg.get_item_type(item) == "mvAppItemType::mvPlotAxis":
                             if "y_axis" in str(item):
@@ -236,10 +240,12 @@ def refresh_data_from_stockdx(symbol="TSLA"):
                             elif "x_axis" in str(item):
                                 dpg.set_axis_limits(item, 0, len(x_data))
                 
-                print(f"✅ Updated chart with real {symbol} data! ({len(df)} points)")
-                print(f"   Current price: ${y_data[-1]:.2f}")
-            else:
-                print("❌ Chart line series not found")
+                print(f"✅ Updated DPG chart with real {symbol} data!")
+            
+            # === SIMPLE DEBUG PLOT ===
+            simple_debug_plot(df, symbol)
+            
+            print(f"✅ Current price: ${y_data[-1]:.2f}")
         else:
             print(f"⚠️ No data returned for {symbol}")
             
@@ -247,6 +253,65 @@ def refresh_data_from_stockdx(symbol="TSLA"):
         print("❌ stockdx library not available")
     except Exception as e:
         print(f"❌ Error updating with real data: {e}")
+
+def simple_debug_plot(df, symbol):
+    """Super simple matplotlib plot - just for debugging"""
+    try:
+        import matplotlib
+        matplotlib.use('Agg')  # Use non-interactive backend
+        import matplotlib.pyplot as plt
+        import tkinter as tk
+        from PIL import Image, ImageTk
+        import io
+        import threading
+        
+        def create_plot():
+            # Create the plot
+            plt.figure(figsize=(10, 6))
+            plt.plot(df['close'])
+            plt.title(f'{symbol} - Close Prices (Debug)')
+            plt.ylabel('Price')
+            plt.xlabel('Data Points')
+            plt.grid(True)
+            
+            # Save to memory instead of showing
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png', dpi=100, bbox_inches='tight')
+            buffer.seek(0)
+            plt.close()  # Close the figure to free memory
+            
+            # Display in tkinter window
+            root = tk.Tk()
+            root.title(f"{symbol} Debug Plot")
+            
+            # Load image
+            image = Image.open(buffer)
+            photo = ImageTk.PhotoImage(image)
+            
+            # Display image
+            label = tk.Label(root, image=photo)
+            label.pack()
+            
+            # Close button
+            close_btn = tk.Button(root, text="Close", command=root.destroy, 
+                                font=('Arial', 10), padx=20, pady=5)
+            close_btn.pack(pady=10)
+            
+            # Keep reference to prevent garbage collection
+            label.image = photo
+            
+            root.mainloop()
+        
+        # Run in thread
+        thread = threading.Thread(target=create_plot, daemon=True)
+        thread.start()
+        print(f"✅ Simple debug plot opened for {symbol}")
+        
+    except Exception as e:
+        print(f"❌ Error creating debug plot: {e}")
+        # Fallback: just print some basic info
+        print(f"Plot fallback - Close prices range: ${df['close'].min():.2f} to ${df['close'].max():.2f}")
+        print(f"Latest price: ${df['close'].iloc[-1]:.2f}")
 
 def export_data():
     """Simulate data export"""
