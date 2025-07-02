@@ -6,14 +6,21 @@ import random
 import time
 
 from utils import constants
-# Global variable to track current stock line tag
+
+# Global variables to track current chart components - MOVED TO TOP
 current_stock_line_tag = None
+current_x_axis_tag = None
+current_y_axis_tag = None
+current_plot_tag = None
 
 def create_main_graph(parent_tag, timestamp=None):
     """
     Creates a content page with a graph on top and a table below with demo data.
     Simplified approach to avoid tag conflicts.
     """
+    # GLOBAL DECLARATION MUST BE FIRST IN FUNCTION
+    global current_stock_line_tag, current_x_axis_tag, current_y_axis_tag, current_plot_tag
+    
     print(f"Creating graph and table content in parent: {parent_tag}")
     
     # Create unique identifier for this instance
@@ -28,21 +35,23 @@ def create_main_graph(parent_tag, timestamp=None):
         dpg.add_text("Stock Price Chart", color=[200, 200, 255])
         dpg.add_spacer(height=5)
         
-        # Generate demo data for the graph
-        x_data = list(range(50))
+        x_data = []
         y_data = []
-        base_price = 100
-        for i in range(50):
-            change = random.uniform(-2, 2)
-            base_price += change
-            y_data.append(max(80, min(120, base_price)))
         
-        # Create the plot with unique tags - FIXED HEIGHT APPROACH
+        # Create the plot with unique tags - STORE ALL TAGS GLOBALLY
         plot_tag = f"plot_{timestamp}"
         x_axis_tag = f"x_axis_{timestamp}"
         y_axis_tag = f"y_axis_{timestamp}"
         line_tag = f"stock_line_{timestamp}"
         graph_container_tag = f"graph_container_{timestamp}"
+        
+        # Store tags globally for later access
+        current_plot_tag = plot_tag
+        current_x_axis_tag = x_axis_tag
+        current_y_axis_tag = y_axis_tag
+        current_stock_line_tag = line_tag
+        
+        print(f"📋 Created tags - Plot: {plot_tag}, X-axis: {x_axis_tag}, Y-axis: {y_axis_tag}, Line: {line_tag}")
         
         # Use a group to contain the plot with specific dimensions
         with dpg.group():
@@ -55,10 +64,6 @@ def create_main_graph(parent_tag, timestamp=None):
                     dpg.set_axis_limits(x_axis_tag, 0, 50)
                     dpg.set_axis_limits(y_axis_tag, 80, 120)
     
-        # Store the line tag globally for refresh function
-        global current_stock_line_tag
-        current_stock_line_tag = line_tag
-        
         # Small buttons below the graph this will also hold the tags for each stock
         dpg.add_spacer(height=5)
         with dpg.group(horizontal=True):
@@ -96,7 +101,17 @@ def create_main_graph(parent_tag, timestamp=None):
                 dpg.bind_item_font(add_fav_btn_tag, constants.font_awesome_icon_font_id)
             dpg.bind_item_theme(add_fav_btn_tag, red_theme_tag)
 
+        # DEBUG BUTTONS - Add these for troubleshooting
+        dpg.add_spacer(height=10)
+        dpg.add_separator()
+        dpg.add_text("Debug Tools:", color=[255, 255, 0])
         
+        with dpg.group(horizontal=True):
+            dpg.add_input_text(width=100,hint="type symbol", tag="symbol")
+            dpg.add_spacer(width=5)
+            dpg.add_button(label="Fetch", 
+                        callback=lambda: fetch_data_from_stockdx(dpg.get_value("symbol")),
+                        width=120)
         dpg.add_spacer(height=20)
         
         # TABLE SECTION
@@ -159,13 +174,15 @@ def create_main_graph(parent_tag, timestamp=None):
         dpg.add_spacer(height=15)
         
         with dpg.group(horizontal=True):
-            dpg.add_button(label="Refresh Data", callback=refresh_data, width=120)
+            dpg.add_button(label="Random Data", callback=refresh_data, width=120)
             dpg.add_spacer(width=10)
             dpg.add_button(label="TSLA Data", callback=refresh_data_from_stockdx_button, width=120)
             dpg.add_spacer(width=10)
             dpg.add_button(label="Export CSV", callback=export_data, width=120)
             dpg.add_spacer(width=10)
             dpg.add_button(label="Back to Welcome", callback=go_to_welcome, width=150)
+        
+
 
 def plus_button_callback():
     """Callback for the plus button"""
@@ -179,6 +196,8 @@ def fav_button_callback():
 
 def refresh_data():
     """Refresh the graph data"""
+    global current_stock_line_tag, current_x_axis_tag, current_y_axis_tag
+    
     print("Refreshing stock data...")
     
     # Generate new data
@@ -190,10 +209,16 @@ def refresh_data():
         base_price += change
         y_data.append(max(80, min(120, base_price)))
     
-    # Update the line series
-    global current_stock_line_tag
+    # Update the line series using stored tag
     if current_stock_line_tag and dpg.does_item_exist(current_stock_line_tag):
         dpg.set_value(current_stock_line_tag, [x_data, y_data])
+        
+        # Update axis limits using stored tags
+        if current_x_axis_tag and dpg.does_item_exist(current_x_axis_tag):
+            dpg.set_axis_limits(current_x_axis_tag, 0, 50)
+        if current_y_axis_tag and dpg.does_item_exist(current_y_axis_tag):
+            dpg.set_axis_limits(current_y_axis_tag, 80, 120)
+            
         print("Graph data refreshed!")
     else:
         print("Graph not found for refresh")
@@ -203,56 +228,106 @@ def refresh_data_from_stockdx_button(user_data):
     fetch_data_from_stockdx("CPALL.BK")
 
 def fetch_data_from_stockdx(symbol):
-    """fetch graph with real stockdx data - simple debug plot"""
+    """FIXED version with proper axis targeting"""
+    global current_stock_line_tag, current_x_axis_tag, current_y_axis_tag, current_plot_tag
+    
+    print("=" * 80)
+    print(f"🔍 STARTING FIXED DATA FETCH FOR SYMBOL: {symbol}")
+    print("=" * 80)
+    
     try:
-        print(f"Fetching real data for {symbol}...")
+        # Steps 1-8: Your existing data fetching logic here...
         from stockdex import Ticker
-        
         ticker = Ticker(ticker=symbol)
         df = ticker.yahoo_api_price(range='1d', dataGranularity='5m')
         
-        if df is not None and not df.empty:
-            print(f"✅ Retrieved {len(df)} data points for {symbol}")
-            print(f"Columns: {list(df.columns)}")
-            print(f"Index type: {type(df.index)}")
-            print(f"First row: {df.iloc[0]}")
-            print(f"Last row: {df.iloc[-1]}")
+        if df is None or df.empty:
+            print("❌ No data received")
+            return
             
-            # Convert to DPG format for the existing chart
-            x_data = list(range(len(df)))
-            y_data = df['close'].tolist()
+        print(f"✅ Retrieved {len(df)} data points for {symbol}")
+        
+        # Convert to DPG format
+        x_data = list(range(len(df)))
+        y_data = df['close'].tolist()
+        
+        print(f"📋 Converted data - X: {len(x_data)} points, Y: {len(y_data)} points")
+        print(f"📋 Y data range: ${min(y_data):.2f} to ${max(y_data):.2f}")
+        
+        # FIXED: Update DPG chart using stored tags
+        print("🎨 FIXED: Updating DPG chart with stored tags...")
+        print(f"📋 Line tag: {current_stock_line_tag}")
+        print(f"📋 X-axis tag: {current_x_axis_tag}")
+        print(f"📋 Y-axis tag: {current_y_axis_tag}")
+        print(f"📋 Plot tag: {current_plot_tag}")
+        
+        # Check if all required tags exist
+        tags_exist = True
+        for tag_name, tag_value in [
+            ("Line", current_stock_line_tag),
+            ("X-axis", current_x_axis_tag), 
+            ("Y-axis", current_y_axis_tag),
+            ("Plot", current_plot_tag)
+        ]:
+            if tag_value is None:
+                print(f"❌ {tag_name} tag is None")
+                tags_exist = False
+            elif not dpg.does_item_exist(tag_value):
+                print(f"❌ {tag_name} tag '{tag_value}' does not exist")
+                tags_exist = False
+            else:
+                print(f"✅ {tag_name} tag exists")
+        
+        if not tags_exist:
+            print("❌ Cannot update chart - missing tags")
+            return
+        
+        # Update the line series data
+        try:
+            print("🔄 Updating line series data...")
+            dpg.set_value(current_stock_line_tag, [x_data, y_data])
+            print("✅ Line series data updated successfully")
+        except Exception as e:
+            print(f"❌ Failed to update line series: {e}")
+            return
+        
+        # Update axis limits using stored tags
+        if len(y_data) > 0:
+            min_price = min(y_data) * 0.995  # Tighter margins
+            max_price = max(y_data) * 1.005
             
-            # Update existing DPG line series
-            global current_stock_line_tag
-            if current_stock_line_tag and dpg.does_item_exist(current_stock_line_tag):
-                dpg.set_value(current_stock_line_tag, [x_data, y_data])
+            print(f"📋 Setting axis limits:")
+            print(f"   X-axis: 0 to {len(x_data)}")
+            print(f"   Y-axis: ${min_price:.2f} to ${max_price:.2f}")
+            
+            try:
+                # Update X-axis
+                dpg.set_axis_limits(current_x_axis_tag, 0, len(x_data))
+                print("✅ X-axis limits updated")
                 
-                # Update axis limits to fit new data
-                if len(y_data) > 0:
-                    min_price = min(y_data) * 0.98
-                    max_price = max(y_data) * 1.02
-                    
-                    # Find and update axis limits
-                    for item in dpg.get_all_items():
-                        if dpg.get_item_type(item) == "mvAppItemType::mvPlotAxis":
-                            if "y_axis" in str(item):
-                                dpg.set_axis_limits(item, min_price, max_price)
-                            elif "x_axis" in str(item):
-                                dpg.set_axis_limits(item, 0, len(x_data))
+                # Update Y-axis  
+                dpg.set_axis_limits(current_y_axis_tag, min_price, max_price)
+                print("✅ Y-axis limits updated")
                 
-                print(f"✅ Updated DPG chart with real {symbol} data!")
-            
-            # === SIMPLE DEBUG PLOT ===
-            simple_debug_plot(df, symbol)
-            
-            print(f"✅ Current price: ${y_data[-1]:.2f}")
-        else:
-            print(f"⚠️ No data returned for {symbol}")
-            
-    except ImportError:
-        print("❌ stockdx library not available")
+            except Exception as e:
+                print(f"❌ Failed to update axis limits: {e}")
+        
+        # Force plot refresh
+        try:
+            print("🔄 Forcing plot refresh...")
+            # These calls can help force DPG to redraw
+            dpg.set_item_width(current_plot_tag, dpg.get_item_width(current_plot_tag))
+            print("✅ Plot refresh triggered")
+        except Exception as e:
+            print(f"⚠️ Plot refresh failed (non-critical): {e}")
+        
+        print(f"✅ Chart update completed for {symbol}")
+        print(f"💰 Latest price: ${y_data[-1]:.2f}")
+        
     except Exception as e:
-        print(f"❌ Error updating with real data: {e}")
+        print(f"❌ Error in FIXED fetch function: {e}")
+        import traceback
+        traceback.print_exc()
 
 def simple_debug_plot(df, symbol):
     """Super simple matplotlib plot - just for debugging"""
