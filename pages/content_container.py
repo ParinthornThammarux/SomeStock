@@ -1,18 +1,19 @@
-# components/main_content.py - Alternative Approach
+# pages/content_container.py - Updated with enhanced charts
 
 import dearpygui.dearpygui as dpg
 from .welcome_page import create_welcome_content
 from .example_page_b import create_example_page_b_content
 from .main_graph_page import create_main_graph
+from .enhanced_main_graph_page import create_enhanced_main_graph  # New import
 
 # Global variable to track current page
-current_page = "welcome" #shows welcom on start
+current_page = "welcome"
 
 def create_main_content(parent_tag):
     """
     Creates the main content area with a single container that gets cleared and repopulated.
     """
-    with dpg.child_window(tag="content_window", width=-1, height=-1, parent=parent_tag,border=False):
+    with dpg.child_window(tag="content_window", width=-1, height=-1, parent=parent_tag, border=False):
         # Apply black background theme
         with dpg.theme(tag="content_window_black_bg_theme"):
             with dpg.theme_component(dpg.mvChildWindow):
@@ -42,8 +43,11 @@ def show_page(page_name):
         create_welcome_content("page_content_container")
         current_page = "welcome"
     elif page_name == "main":
-        create_main_graph("page_content_container")
+        create_main_graph("page_content_container")  # Original simple chart
         current_page = "main"
+    elif page_name == "enhanced":  # New enhanced page
+        create_enhanced_main_graph("page_content_container")
+        current_page = "enhanced"
     elif page_name == "page_b":
         create_example_page_b_content("page_content_container")
         current_page = "page_b"
@@ -57,8 +61,10 @@ def get_current_page():
     """Returns the current page name"""
     return current_page
 
-# For backward compatibility
+# Updated pages dictionary
 PAGES = {
     "welcome": {"tag": "welcome"},
+    "main": {"tag": "main"},
+    "enhanced": {"tag": "enhanced"},  # New enhanced page
     "page_b": {"tag": "page_b"},
 }
