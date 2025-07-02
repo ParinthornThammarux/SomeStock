@@ -5,10 +5,10 @@ import pandas as pd
 import numpy as np
 
 from utils import constants
+from utils.matplotlib_integration import DPGMatplotlibIntegration
 
 def create_advanced_analysis_tab(parent_tag, timestamp):
     """Advanced analysis with pandas and matplotlib"""
-    global matplotlib_helper
     
     dpg.add_spacer(height=20)
     dpg.add_text("Advanced Financial Analysis", color=[200, 200, 255])
@@ -42,7 +42,9 @@ def create_advanced_analysis_tab(parent_tag, timestamp):
         
 def generate_advanced_charts(parent_tag, timestamp):
     """Generate advanced matplotlib charts"""
-    global matplotlib_helper
+    
+    # Create matplotlib helper instance
+    matplotlib_helper = DPGMatplotlibIntegration()
     
     chart_container_tag = f"advanced_charts_container_{timestamp}"
     
@@ -53,17 +55,29 @@ def generate_advanced_charts(parent_tag, timestamp):
     # Generate new charts
     dpg.add_text("Generating advanced analysis...", parent=chart_container_tag, color=[255, 255, 0])
     
-    # Create advanced pandas chart
-    matplotlib_helper.create_advanced_pandas_chart(chart_container_tag, width=1000, height=600)
-    
-    dpg.add_spacer(height=20, parent=chart_container_tag)
-    dpg.add_button(label="Refresh Charts", 
-                  callback=lambda: generate_advanced_charts(parent_tag, timestamp),
-                  parent=chart_container_tag)
+    try:
+        # Create advanced pandas chart
+        matplotlib_helper.create_advanced_pandas_chart(chart_container_tag, width=1000, height=600)
+        
+        dpg.add_spacer(height=20, parent=chart_container_tag)
+        dpg.add_button(label="Refresh Charts", 
+                      callback=lambda: generate_advanced_charts(parent_tag, timestamp),
+                      parent=chart_container_tag)
+    except Exception as e:
+        dpg.add_text(f"Error generating charts: {e}", parent=chart_container_tag, color=[255, 0, 0])
+        print(f"Error in generate_advanced_charts: {e}")
+    finally:
+        # Clean up matplotlib helper
+        try:
+            matplotlib_helper.cleanup()
+        except:
+            pass
 
 def generate_timeframe_analysis(parent_tag, timestamp):
     """Generate timeframe-specific analysis"""
-    global matplotlib_helper
+    
+    # Create matplotlib helper instance
+    matplotlib_helper = DPGMatplotlibIntegration()
     
     chart_container_tag = f"advanced_charts_container_{timestamp}"
     
@@ -71,15 +85,25 @@ def generate_timeframe_analysis(parent_tag, timestamp):
     if dpg.does_item_exist(chart_container_tag):
         dpg.delete_item(chart_container_tag, children_only=True)
     
-    # Create sample timeframe data
-    dates = pd.date_range('2023-01-01', '2024-12-31', freq='D')
-    sample_data = pd.DataFrame({
-        'date': dates,
-        'price': 100 * np.exp(np.cumsum(np.random.normal(0.001, 0.02, len(dates))))
-    })
-    
-    # Generate timeframe chart
-    matplotlib_helper.create_pandas_timeframe_chart(sample_data, chart_container_tag, width=1000, height=400)
-    
-    dpg.add_spacer(height=20, parent=chart_container_tag)
-    dpg.add_text("Timeframe Analysis Complete", parent=chart_container_tag, color=[0, 255, 0])
+    try:
+        # Create sample timeframe data
+        dates = pd.date_range('2023-01-01', '2024-12-31', freq='D')
+        sample_data = pd.DataFrame({
+            'date': dates,
+            'price': 100 * np.exp(np.cumsum(np.random.normal(0.001, 0.02, len(dates))))
+        })
+        
+        # Generate timeframe chart
+        matplotlib_helper.create_pandas_timeframe_chart(sample_data, chart_container_tag, width=1000, height=400)
+        
+        dpg.add_spacer(height=20, parent=chart_container_tag)
+        dpg.add_text("Timeframe Analysis Complete", parent=chart_container_tag, color=[0, 255, 0])
+    except Exception as e:
+        dpg.add_text(f"Error generating timeframe analysis: {e}", parent=chart_container_tag, color=[255, 0, 0])
+        print(f"Error in generate_timeframe_analysis: {e}")
+    finally:
+        # Clean up matplotlib helper
+        try:
+            matplotlib_helper.cleanup()
+        except:
+            pass

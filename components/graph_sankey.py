@@ -4,10 +4,10 @@ import dearpygui.dearpygui as dpg
 import random
 
 from utils import constants
+from utils.plotly_integration import PlotlyInteractiveIntegration
 
 def create_sankey_tab(parent_tag, timestamp):
     """Sankey flow analysis tab"""
-    global plotly_helper
     
     dpg.add_spacer(height=20)
     dpg.add_text("Financial Flow Analysis", color=[255, 200, 100])
@@ -76,70 +76,61 @@ def fav_button_callback():
 
 def refresh_data():
     """Refresh the graph data"""
-    global current_stock_line_tag
     print("Refreshing stock data...")
-    
-    # Generate new data
-    x_data = list(range(50))
-    y_data = []
-    base_price = random.uniform(90, 110)
-    for i in range(50):
-        change = random.uniform(-2, 2)
-        base_price += change
-        y_data.append(max(80, min(120, base_price)))
-    
-    # Update the line series
-    if current_stock_line_tag and dpg.does_item_exist(current_stock_line_tag):
-        dpg.set_value(current_stock_line_tag, [x_data, y_data])
-        print("Graph data refreshed!")
-    else:
-        print("Graph not found for refresh")
-
-
+    # This function is referenced but the implementation would depend on the specific chart
 
 def open_cashflow_sankey():
     """Open cash flow Sankey diagram"""
-    global plotly_helper
-    filepath = plotly_helper.create_interactive_sankey()
-    plotly_helper.open_in_browser(filepath)
-    print(f"Opened cash flow Sankey: {filepath}")
+    try:
+        plotly_helper = PlotlyInteractiveIntegration()
+        filepath = plotly_helper.create_interactive_sankey()
+        plotly_helper.open_in_browser(filepath)
+        print(f"Opened cash flow Sankey: {filepath}")
+    except Exception as e:
+        print(f"Error opening cash flow Sankey: {e}")
 
 def open_revenue_sankey():
     """Open revenue breakdown Sankey"""
-    global plotly_helper
-    
-    # Custom revenue data
-    revenue_data = {
-        'labels': [
-            'Total Revenue', 'Product Sales', 'Services', 'Subscriptions',
-            'North America', 'Europe', 'Asia Pacific', 'Other',
-            'Enterprise', 'Consumer', 'Government'
-        ],
-        'sources': [0, 0, 0, 1, 1, 1, 1, 2, 2, 2],
-        'targets': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-        'values': [700, 200, 100, 300, 250, 100, 50, 120, 60, 20]
-    }
-    
-    filepath = plotly_helper.create_interactive_sankey(revenue_data)
-    plotly_helper.open_in_browser(filepath)
-    print(f"Opened revenue Sankey: {filepath}")
+    try:
+        plotly_helper = PlotlyInteractiveIntegration()
+        
+        # Custom revenue data
+        revenue_data = {
+            'labels': [
+                'Total Revenue', 'Product Sales', 'Services', 'Subscriptions',
+                'North America', 'Europe', 'Asia Pacific', 'Other',
+                'Enterprise', 'Consumer', 'Government'
+            ],
+            'sources': [0, 0, 0, 1, 1, 1, 1, 2, 2, 2],
+            'targets': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            'values': [700, 200, 100, 300, 250, 100, 50, 120, 60, 20]
+        }
+        
+        filepath = plotly_helper.create_interactive_sankey(revenue_data)
+        plotly_helper.open_in_browser(filepath)
+        print(f"Opened revenue Sankey: {filepath}")
+    except Exception as e:
+        print(f"Error opening revenue Sankey: {e}")
 
 def open_asset_allocation_sankey():
     """Open asset allocation Sankey"""
-    global plotly_helper
-    
-    # Asset allocation data
-    asset_data = {
-        'labels': [
-            'Portfolio', 'Equities', 'Bonds', 'Alternatives',
-            'US Stocks', 'International', 'Emerging Markets',
-            'Government Bonds', 'Corporate Bonds', 'REITs', 'Commodities'
-        ],
-        'sources': [0, 0, 0, 1, 1, 1, 2, 2, 3, 3],
-        'targets': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-        'values': [600, 300, 100, 350, 150, 100, 200, 100, 60, 40]
-    }
-    
-    filepath = plotly_helper.create_interactive_sankey(asset_data)
-    plotly_helper.open_in_browser(filepath)
-    print(f"Opened asset allocation Sankey: {filepath}")
+    try:
+        plotly_helper = PlotlyInteractiveIntegration()
+        
+        # Asset allocation data
+        asset_data = {
+            'labels': [
+                'Portfolio', 'Equities', 'Bonds', 'Alternatives',
+                'US Stocks', 'International', 'Emerging Markets',
+                'Government Bonds', 'Corporate Bonds', 'REITs', 'Commodities'
+            ],
+            'sources': [0, 0, 0, 1, 1, 1, 2, 2, 3, 3],
+            'targets': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            'values': [600, 300, 100, 350, 150, 100, 200, 100, 60, 40]
+        }
+        
+        filepath = plotly_helper.create_interactive_sankey(asset_data)
+        plotly_helper.open_in_browser(filepath)
+        print(f"Opened asset allocation Sankey: {filepath}")
+    except Exception as e:
+        print(f"Error opening asset allocation Sankey: {e}")
