@@ -61,12 +61,12 @@ def create_graph_tabs(parent_tag):
         ):
             
             # Title
-            dpg.add_text("Advanced Stock Analysis Dashboard", color=[255, 255, 255])
+            dpg.add_text("Advanced Stock Analysis Dashboard", color=[255, 255, 255],indent=5)
             dpg.add_separator()
             dpg.add_spacer(height=10)
             
             # Create tab bar for different chart types
-            with dpg.tab_bar(tag=chart_tabs_tag):
+            with dpg.tab_bar(tag=chart_tabs_tag,indent=50,):
                 
                 # Tab 1: Original DPG charts
                 with dpg.tab(label="DPG Charts", tag=f"dpg_tab_{timestamp}") as dpg_tab:

@@ -75,11 +75,11 @@ def icon_button_callback(sender, app_data, user_data):
 
     # Show page stuff put here!!! if we have more pages we can put it
     if sender == "dashboard_icon_btn" or button_label == "Dashboard":
-        show_page("main")  # Use enhanced page instead of main
+        show_page("enhanced")  # send to graph container
     elif sender == "search_icon_btn" or button_label == "Search":
         show_page("page_b")
     elif sender == "portfolio_icon_btn" or button_label == "Portfolio":
-        show_page("enhanced")  # Portfolio analysis in enhanced page
+        show_page("page_b")  # main as forback
     elif sender == "add_icon_btn" or button_label == "Add Item":
         show_page("page_b")
     elif sender == "remove_icon_btn" or button_label == "Remove Item":

@@ -23,11 +23,7 @@ def create_main_graph(parent_tag, timestamp=None):
     # Create a main container with proper height management
     main_container_tag = f"main_container_{timestamp}"
     with dpg.child_window(width=-1, height=-1, parent=parent_tag, tag=main_container_tag, no_scrollbar=False):
-        # Title
-        dpg.add_text("Stock Analysis Dashboard", color=[255, 255, 255])
-        dpg.add_separator()
-        dpg.add_spacer(height=10)
-        
+
         # GRAPH SECTION - Fixed height container
         dpg.add_text("Stock Price Chart", color=[200, 200, 255])
         dpg.add_spacer(height=5)
@@ -50,7 +46,7 @@ def create_main_graph(parent_tag, timestamp=None):
         
         # Use a group to contain the plot with specific dimensions
         with dpg.group():
-            with dpg.child_window(width=-1, height=250, tag=graph_container_tag, border=True):
+            with dpg.child_window(width=-1, height=280, tag=graph_container_tag, border=True):
                 with dpg.plot(label="", height=-1, width=-1, tag=plot_tag, no_title=True):
                     dpg.add_plot_legend()
                     dpg.add_plot_axis(dpg.mvXAxis, label="Days", tag=x_axis_tag)
@@ -67,29 +63,38 @@ def create_main_graph(parent_tag, timestamp=None):
         dpg.add_spacer(height=5)
         with dpg.group(horizontal=True):
             
-            #Green theme
-            with dpg.theme(tag="green_button_theme"):
-                with dpg.theme_component(dpg.mvButton):
-                    dpg.add_theme_color(dpg.mvThemeCol_Button, [0, 128, 0, 255])        # Normal state - green
-                    dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, [0, 180, 0, 255]) # Hover state - lighter green
-                    dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, [0, 100, 0, 255])  # Clicked state - darker green
+            # Create themes with unique tags
+            green_theme_tag = f"green_button_theme_{timestamp}"
+            red_theme_tag = f"red_button_theme_{timestamp}"
             
-            #Red theme
-            with dpg.theme(tag="red_button_theme"):
-                with dpg.theme_component(dpg.mvButton):
-                    dpg.add_theme_color(dpg.mvThemeCol_Button, [128, 0, 0, 255])        # Normal state - red
-                    dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, [180, 0, 0, 255]) # Hover state - lighter red
-                    dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, [100, 0, 0, 255])  # Clicked state - darker red
+            # Only create themes if they don't exist
+            if not dpg.does_item_exist(green_theme_tag):
+                with dpg.theme(tag=green_theme_tag):
+                    with dpg.theme_component(dpg.mvButton):
+                        dpg.add_theme_color(dpg.mvThemeCol_Button, [0, 128, 0, 255])        # Normal state - green
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, [0, 180, 0, 255]) # Hover state - lighter green
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, [0, 100, 0, 255])  # Clicked state - darker green
+            
+            if not dpg.does_item_exist(red_theme_tag):
+                with dpg.theme(tag=red_theme_tag):
+                    with dpg.theme_component(dpg.mvButton):
+                        dpg.add_theme_color(dpg.mvThemeCol_Button, [128, 0, 0, 255])        # Normal state - red
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, [180, 0, 0, 255]) # Hover state - lighter red
+                        dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, [100, 0, 0, 255])  # Clicked state - darker red
 
-            dpg.add_button(tag="add_stock_button",label=constants.ICON_PLUS, width=30, height=30, callback=plus_button_callback)
-            dpg.bind_item_font("add_stock_button", constants.font_awesome_icon_font_id)
-            dpg.bind_item_theme("add_stock_button", "green_button_theme")
+            add_stock_btn_tag = f"add_stock_button_{timestamp}"
+            add_fav_btn_tag = f"add_fav_stock_button_{timestamp}"
+            
+            dpg.add_button(tag=add_stock_btn_tag, label=constants.ICON_PLUS, width=30, height=30, callback=plus_button_callback)
+            if constants.font_awesome_icon_font_id:
+                dpg.bind_item_font(add_stock_btn_tag, constants.font_awesome_icon_font_id)
+            dpg.bind_item_theme(add_stock_btn_tag, green_theme_tag)
             
             # Heart button
-            dpg.add_button(tag="add_fav_stock_button",label=constants.ICON_HEART, width=30, height=30, callback=fav_button_callback)
-            dpg.bind_item_font("add_fav_stock_button", constants.font_awesome_icon_font_id)
-            dpg.bind_item_theme("add_fav_stock_button", "red_button_theme")
-
+            dpg.add_button(tag=add_fav_btn_tag, label=constants.ICON_HEART, width=30, height=30, callback=fav_button_callback)
+            if constants.font_awesome_icon_font_id:
+                dpg.bind_item_font(add_fav_btn_tag, constants.font_awesome_icon_font_id)
+            dpg.bind_item_theme(add_fav_btn_tag, red_theme_tag)
 
         
         dpg.add_spacer(height=20)
@@ -199,7 +204,7 @@ def export_data():
 def go_to_welcome():
     """Go back to welcome page"""
     print("Going back to welcome page")
-    from ..containers.content_container import show_page
+    from containers.content_container import show_page
     show_page("welcome")
 
 # Keep the old function for backward compatibility

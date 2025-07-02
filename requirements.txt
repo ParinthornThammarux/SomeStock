@@ -1,4 +1,17 @@
-# Core GUI framework
-dearpygui>=1.10.1
-
 # pip install -r requirements.txt นาจา
+
+# Core GUI Framework
+dearpygui>=1.11.1
+
+# Data Analysis and Visualization
+pandas>=2.0.0
+numpy>=1.24.0
+matplotlib>=3.7.0
+plotly>=5.17.0
+kaleido>=0.2.1
+
+# Image Processing
+Pillow>=10.0.0
+
+# Additional utilities
+pathlib2>=2.3.7
