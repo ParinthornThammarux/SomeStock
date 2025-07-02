@@ -1,4 +1,4 @@
-# pip install -r requirements.txt นาจา
+# pip install -r requirements.txt
 
 # Core GUI Framework
 dearpygui>=1.11.1
@@ -12,6 +12,9 @@ kaleido>=0.2.1
 
 # Image Processing
 Pillow>=10.0.0
+
+# Stock Data Source
+stockdex>=1.0.6
 
 # Additional utilities
 pathlib2>=2.3.7
