@@ -3,7 +3,7 @@
 import dearpygui.dearpygui as dpg
 import time
 from components.sidebar import create_sidebar
-from components.main_content import create_main_content, show_page  # Import the new show_page
+from pages.content_container import create_main_content, show_page  # Import the new show_page
 from utils import constants
 
 # --- Animation State Variables ---
@@ -73,7 +73,7 @@ def icon_button_callback(sender, app_data, user_data):
 
     # Show page stuff put here!!! if we have more pages we can put it
     if sender == "dashboard_icon_btn" or button_label == "Dashboard":
-        show_page("welcome")
+        show_page("main")
     elif sender == "search_icon_btn" or button_label == "Search":
         show_page("page_b")
     elif sender == "portfolio_icon_btn" or button_label == "Portfolio":

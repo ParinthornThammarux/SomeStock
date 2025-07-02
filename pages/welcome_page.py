@@ -66,7 +66,7 @@ def create_welcome_content(parent_tag):
 def test_show_page_b():
     """Test function to show Page B using the new system"""
     print("Test button clicked - switching to Page B")
-    from .main_content import show_page
+    from .content_container import show_page
     show_page("page_b")
 
 # Keep the old function for backward compatibility, but make it use the new system
