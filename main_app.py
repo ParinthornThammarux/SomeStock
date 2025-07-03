@@ -4,6 +4,7 @@ import dearpygui.dearpygui as dpg
 import time
 from components.sidebar import create_sidebar
 from containers.container_content import create_main_content, show_page
+from components.stock_search import load_stock_data
 from utils import constants
 
 # --- Animation State Variables ---
@@ -103,7 +104,7 @@ def main():
             )
             
             create_main_content(parent_tag="root_group")
-
+    load_stock_data()
     dpg.set_primary_window("main_window", True)
     dpg.show_viewport()
     dpg.start_dearpygui()

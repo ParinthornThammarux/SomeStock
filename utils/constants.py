@@ -4,7 +4,7 @@ import dearpygui.dearpygui as dpg
 import os
 from pathlib import Path
 
-VERSION = "v1.0.1 Graph demo"
+VERSION = "v1.0.5 fetch works"
 # --- Font Awesome Icon Setup ---
 # IMPORTANT: You need the Font Awesome Free font file 'fa-solid-900.ttf'.
 # Place it in the root directory of your project (your_project_folder/).

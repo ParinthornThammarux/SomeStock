@@ -6,7 +6,8 @@ import random
 import time
 
 from utils import constants
-
+from utils.stockdex_layer import fetch_data_from_stockdx
+from components.stock_search import create_stock_search
 # Global variables to track current chart components - MOVED TO TOP
 current_stock_line_tag = None
 current_x_axis_tag = None
@@ -66,7 +67,7 @@ def create_main_graph(parent_tag, timestamp=None):
     
         # Small buttons below the graph this will also hold the tags for each stock
         dpg.add_spacer(height=5)
-        with dpg.group(horizontal=True):
+        with dpg.group(horizontal=True, tag='tag_container'):
             
             # Create themes with unique tags
             green_theme_tag = f"green_button_theme_{timestamp}"
@@ -110,8 +111,13 @@ def create_main_graph(parent_tag, timestamp=None):
             dpg.add_input_text(width=100,hint="type symbol", tag="symbol")
             dpg.add_spacer(width=5)
             dpg.add_button(label="Fetch", 
-                        callback=lambda: fetch_data_from_stockdx(dpg.get_value("symbol")),
-                        width=120)
+              callback=lambda: fetch_data_from_stockdx(
+                  dpg.get_value("symbol"), 
+                  current_stock_line_tag, 
+                  current_x_axis_tag, 
+                  current_y_axis_tag,
+                  current_plot_tag  
+              ))
         dpg.add_spacer(height=20)
         
         # TABLE SECTION
@@ -181,16 +187,17 @@ def create_main_graph(parent_tag, timestamp=None):
             dpg.add_button(label="Export CSV", callback=export_data, width=120)
             dpg.add_spacer(width=10)
             dpg.add_button(label="Back to Welcome", callback=go_to_welcome, width=150)
-        
-
 
 def plus_button_callback():
-    """Callback for the plus button"""
     print("Plus button clicked!")
-    # Add your plus button functionality here
+    create_stock_search(
+        current_stock_line_tag,
+        current_x_axis_tag,
+        current_y_axis_tag,
+        current_plot_tag
+    )
 
 def fav_button_callback():
-    """Callback for the heart button"""
     print("Heart button clicked!")
     # Add your heart button functionality here
 
@@ -227,107 +234,7 @@ def refresh_data_from_stockdx_button(user_data):
     """Button callback wrapper for stockdx data"""
     fetch_data_from_stockdx("CPALL.BK")
 
-def fetch_data_from_stockdx(symbol):
-    """FIXED version with proper axis targeting"""
-    global current_stock_line_tag, current_x_axis_tag, current_y_axis_tag, current_plot_tag
-    
-    print("=" * 80)
-    print(f"🔍 STARTING FIXED DATA FETCH FOR SYMBOL: {symbol}")
-    print("=" * 80)
-    
-    try:
-        # Steps 1-8: Your existing data fetching logic here...
-        from stockdex import Ticker
-        ticker = Ticker(ticker=symbol)
-        df = ticker.yahoo_api_price(range='1d', dataGranularity='5m')
-        
-        if df is None or df.empty:
-            print("❌ No data received")
-            return
-            
-        print(f"✅ Retrieved {len(df)} data points for {symbol}")
-        
-        # Convert to DPG format
-        x_data = list(range(len(df)))
-        y_data = df['close'].tolist()
-        
-        print(f"📋 Converted data - X: {len(x_data)} points, Y: {len(y_data)} points")
-        print(f"📋 Y data range: ${min(y_data):.2f} to ${max(y_data):.2f}")
-        
-        # FIXED: Update DPG chart using stored tags
-        print("🎨 FIXED: Updating DPG chart with stored tags...")
-        print(f"📋 Line tag: {current_stock_line_tag}")
-        print(f"📋 X-axis tag: {current_x_axis_tag}")
-        print(f"📋 Y-axis tag: {current_y_axis_tag}")
-        print(f"📋 Plot tag: {current_plot_tag}")
-        
-        # Check if all required tags exist
-        tags_exist = True
-        for tag_name, tag_value in [
-            ("Line", current_stock_line_tag),
-            ("X-axis", current_x_axis_tag), 
-            ("Y-axis", current_y_axis_tag),
-            ("Plot", current_plot_tag)
-        ]:
-            if tag_value is None:
-                print(f"❌ {tag_name} tag is None")
-                tags_exist = False
-            elif not dpg.does_item_exist(tag_value):
-                print(f"❌ {tag_name} tag '{tag_value}' does not exist")
-                tags_exist = False
-            else:
-                print(f"✅ {tag_name} tag exists")
-        
-        if not tags_exist:
-            print("❌ Cannot update chart - missing tags")
-            return
-        
-        # Update the line series data
-        try:
-            print("🔄 Updating line series data...")
-            dpg.set_value(current_stock_line_tag, [x_data, y_data])
-            print("✅ Line series data updated successfully")
-        except Exception as e:
-            print(f"❌ Failed to update line series: {e}")
-            return
-        
-        # Update axis limits using stored tags
-        if len(y_data) > 0:
-            min_price = min(y_data) * 0.995  # Tighter margins
-            max_price = max(y_data) * 1.005
-            
-            print(f"📋 Setting axis limits:")
-            print(f"   X-axis: 0 to {len(x_data)}")
-            print(f"   Y-axis: ${min_price:.2f} to ${max_price:.2f}")
-            
-            try:
-                # Update X-axis
-                dpg.set_axis_limits(current_x_axis_tag, 0, len(x_data))
-                print("✅ X-axis limits updated")
-                
-                # Update Y-axis  
-                dpg.set_axis_limits(current_y_axis_tag, min_price, max_price)
-                print("✅ Y-axis limits updated")
-                
-            except Exception as e:
-                print(f"❌ Failed to update axis limits: {e}")
-        
-        # Force plot refresh
-        try:
-            print("🔄 Forcing plot refresh...")
-            # These calls can help force DPG to redraw
-            dpg.set_item_width(current_plot_tag, dpg.get_item_width(current_plot_tag))
-            print("✅ Plot refresh triggered")
-        except Exception as e:
-            print(f"⚠️ Plot refresh failed (non-critical): {e}")
-        
-        print(f"✅ Chart update completed for {symbol}")
-        print(f"💰 Latest price: ${y_data[-1]:.2f}")
-        
-    except Exception as e:
-        print(f"❌ Error in FIXED fetch function: {e}")
-        import traceback
-        traceback.print_exc()
+
 
 def simple_debug_plot(df, symbol):
     """Super simple matplotlib plot - just for debugging"""
