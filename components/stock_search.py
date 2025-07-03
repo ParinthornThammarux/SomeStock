@@ -6,6 +6,7 @@ stock_data = None
 chart_tags = {}
 
 from utils.stockdex_layer import fetch_data_from_stockdx
+from components.stock_tag import add_stock_tag
 
 def load_stock_data():
     """Load stock data from JSON file on startup"""
@@ -70,7 +71,7 @@ def create_stock_search(line_tag, x_axis_tag, y_axis_tag, plot_tag):
             dpg.add_table_column(label="Industry", width_fixed=False, init_width_or_weight=100)
             dpg.add_table_column(label="Market Cap", width_fixed=False, init_width_or_weight=100)
 
-        #dpg.add_button(label="Search", width=60, callback=search_callback)
+        dpg.add_button(label="Search", width=60, callback=search_callback)
 
 def search_callback():
     symbol = dpg.get_value('stock_name')
@@ -175,7 +176,7 @@ def typing_callback():
             
 def row_clicked(stock_data):
     #print(f"Selected stock: {stock_data['symbol']} - {stock_data['company_name']}")
-    
+    add_stock_tag(stock_data['symbol'])
     if dpg.does_item_exist("stock_search_popup"):
         dpg.delete_item("stock_search_popup")
         

@@ -67,40 +67,42 @@ def create_main_graph(parent_tag, timestamp=None):
     
         # Small buttons below the graph this will also hold the tags for each stock
         dpg.add_spacer(height=5)
-        with dpg.group(horizontal=True, tag='tag_container'):
-            
-            # Create themes with unique tags
-            green_theme_tag = f"green_button_theme_{timestamp}"
-            red_theme_tag = f"red_button_theme_{timestamp}"
-            
-            # Only create themes if they don't exist
-            if not dpg.does_item_exist(green_theme_tag):
-                with dpg.theme(tag=green_theme_tag):
-                    with dpg.theme_component(dpg.mvButton):
-                        dpg.add_theme_color(dpg.mvThemeCol_Button, [0, 128, 0, 255])        # Normal state - green
-                        dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, [0, 180, 0, 255]) # Hover state - lighter green
-                        dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, [0, 100, 0, 255])  # Clicked state - darker green
-            
-            if not dpg.does_item_exist(red_theme_tag):
-                with dpg.theme(tag=red_theme_tag):
-                    with dpg.theme_component(dpg.mvButton):
-                        dpg.add_theme_color(dpg.mvThemeCol_Button, [128, 0, 0, 255])        # Normal state - red
-                        dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, [180, 0, 0, 255]) # Hover state - lighter red
-                        dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, [100, 0, 0, 255])  # Clicked state - darker red
+        with dpg.group(horizontal=True):
+            with dpg.group(horizontal=True, tag='tags_container'):
+                dpg.add_spacer(width=-1)
+            with dpg.group(horizontal=True):
+                # Create themes with unique tags
+                green_theme_tag = f"green_button_theme_{timestamp}"
+                red_theme_tag = f"red_button_theme_{timestamp}"
+                
+                # Only create themes if they don't exist
+                if not dpg.does_item_exist(green_theme_tag):
+                    with dpg.theme(tag=green_theme_tag):
+                        with dpg.theme_component(dpg.mvButton):
+                            dpg.add_theme_color(dpg.mvThemeCol_Button, [0, 128, 0, 255])        # Normal state - green
+                            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, [0, 180, 0, 255]) # Hover state - lighter green
+                            dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, [0, 100, 0, 255])  # Clicked state - darker green
+                
+                if not dpg.does_item_exist(red_theme_tag):
+                    with dpg.theme(tag=red_theme_tag):
+                        with dpg.theme_component(dpg.mvButton):
+                            dpg.add_theme_color(dpg.mvThemeCol_Button, [128, 0, 0, 255])        # Normal state - red
+                            dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, [180, 0, 0, 255]) # Hover state - lighter red
+                            dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, [100, 0, 0, 255])  # Clicked state - darker red
 
-            add_stock_btn_tag = f"add_stock_button_{timestamp}"
-            add_fav_btn_tag = f"add_fav_stock_button_{timestamp}"
-            
-            dpg.add_button(tag=add_stock_btn_tag, label=constants.ICON_PLUS, width=30, height=30, callback=plus_button_callback)
-            if constants.font_awesome_icon_font_id:
-                dpg.bind_item_font(add_stock_btn_tag, constants.font_awesome_icon_font_id)
-            dpg.bind_item_theme(add_stock_btn_tag, green_theme_tag)
-            
-            # Heart button
-            dpg.add_button(tag=add_fav_btn_tag, label=constants.ICON_HEART, width=30, height=30, callback=fav_button_callback)
-            if constants.font_awesome_icon_font_id:
-                dpg.bind_item_font(add_fav_btn_tag, constants.font_awesome_icon_font_id)
-            dpg.bind_item_theme(add_fav_btn_tag, red_theme_tag)
+                add_stock_btn_tag = f"add_stock_button_{timestamp}"
+                add_fav_btn_tag = f"add_fav_stock_button_{timestamp}"
+                
+                dpg.add_button(tag=add_stock_btn_tag, label=constants.ICON_PLUS, width=30, height=30, callback=plus_button_callback)
+                if constants.font_awesome_icon_font_id:
+                    dpg.bind_item_font(add_stock_btn_tag, constants.font_awesome_icon_font_id)
+                dpg.bind_item_theme(add_stock_btn_tag, green_theme_tag)
+                
+                # Heart button
+                dpg.add_button(tag=add_fav_btn_tag, label=constants.ICON_HEART, width=30, height=30, callback=fav_button_callback)
+                if constants.font_awesome_icon_font_id:
+                    dpg.bind_item_font(add_fav_btn_tag, constants.font_awesome_icon_font_id)
+                dpg.bind_item_theme(add_fav_btn_tag, red_theme_tag)
 
         # DEBUG BUTTONS - Add these for troubleshooting
         dpg.add_spacer(height=10)
