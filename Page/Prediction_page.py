@@ -31,7 +31,7 @@ class PredictionWindow(QMainWindow):
         left_layout.addWidget(self.label_input)
 
         self.combo = QComboBox()
-        self.combo.addItems(["RSI", "PricePrediction","Binomial Prediction", "Hammer search", "Doji search", "EMA Cross", "PEG Ratio", "MACD","Trending"])
+        self.combo.addItems(["RSI", "PricePrediction","Binomial Prediction", "Hammer search", "Doji search", "EMA Cross", "PEG Ratio", "MACD","Trending","Aroon"])
         self.combo.setPlaceholderText("Select an option")
         left_layout.addWidget(self.combo)
 
@@ -85,25 +85,27 @@ class PredictionWindow(QMainWindow):
 
         self.result_text.clear()
 
-        if option == "PricePrediction":
-            success = Prediction.predict_next_price(symbol)
-        elif option == "RSI":
-            success = Prediction.predict_rsi(symbol)
-        elif option == "Hammer search":
-            success = Prediction.detect_hammer(symbol)
-        elif option == "Doji search":
-            success = Prediction.detect_doji(symbol)
-        elif option == "EMA Cross":
-            success = Prediction.detect_ema_cross(symbol)
-        elif option == "PEG Ratio":
-            success = Prediction.predict_peg_ratio(symbol)
-        elif option == "MACD":
-            success = Prediction.predict_MACD(symbol)
-        elif option == "Binomial Prediction":
-            success = Prediction.predict_price_binomial(symbol)
-        elif option == "Trending":
-            success = Prediction.predict_momentum(symbol)
-        else:
-            success = "Invalid Option"
-
+        match option:
+            case "PricePrediction":
+                success = Prediction.predict_next_price(symbol)
+            case "RSI":
+                success = Prediction.predict_rsi(symbol)
+            case "Hammer search":
+                success = Prediction.detect_hammer(symbol)
+            case "Doji search":
+                success = Prediction.detect_doji(symbol)
+            case "EMA Cross":
+                success = Prediction.detect_ema_cross(symbol)
+            case "PEG Ratio":
+                success = Prediction.predict_peg_ratio(symbol)
+            case "MACD":
+                success = Prediction.predict_MACD(symbol)
+            case "Binomial Prediction":
+                success = Prediction.predict_price_binomial(symbol)
+            case "Trending":
+                success = Prediction.predict_momentum(symbol)
+            case "Aroon":
+                success = Prediction.predict_aroon(symbol)
+            case _:
+                success = "Invalid Option"
         self.result_text.setText(f"Prediction for {symbol} : {success:.2f}" if isinstance(success, float) else str(success))

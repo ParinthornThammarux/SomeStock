@@ -346,3 +346,28 @@ def predict_momentum(symbol):
     plt.show()
 
     return latest_momentum
+
+def predict_aroon(symbol):
+    data = fetch_data(symbol)
+    data.set_index('Date', inplace=True)
+
+    data['Aroon_Up'], data['Aroon_Down'] = talib.AROON(data['High'], data['Low'], timeperiod=14)
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(data.index, data['Aroon_Up'], label='Aroon Up', color='green')
+    plt.plot(data.index, data['Aroon_Down'], label='Aroon Down', color='red')
+    plt.axhline(70, color='blue', linestyle='--', label='Overbought (70)')
+    plt.axhline(30, color='orange', linestyle='--', label='Oversold (30)')
+    plt.title(f"{symbol} - Aroon Indicator")
+    plt.xlabel("Date")
+    plt.ylabel("Aroon Value")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    latest_aroon_up = data['Aroon_Up'].iloc[-1]
+    latest_aroon_down = data['Aroon_Down'].iloc[-1]
+    print(f"📈 {symbol} - Latest Aroon Up: {latest_aroon_up:.2f}, Aroon Down: {latest_aroon_down:.2f}")
+
+    return latest_aroon_up, latest_aroon_down
