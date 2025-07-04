@@ -11,7 +11,6 @@ def fetch_data_from_stockdx(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag):
     print("=" * 80)
     
     try:
-        # Steps 1-8: Your existing data fetching logic here...
         from stockdex import Ticker
         ticker = Ticker(ticker=symbol)
         df = ticker.yahoo_api_price(range='1d', dataGranularity='5m')

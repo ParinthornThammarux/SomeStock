@@ -180,7 +180,7 @@ def row_clicked(stock_data):
     if dpg.does_item_exist("stock_search_popup"):
         dpg.delete_item("stock_search_popup")
         
-    # fetch and display data
+    # fetch and display data (move to inside create stock tag?)
     fetch_data_from_stockdx(
         stock_data['symbol'],
         chart_tags['line_tag'],

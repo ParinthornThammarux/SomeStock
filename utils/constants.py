@@ -4,7 +4,8 @@ import dearpygui.dearpygui as dpg
 import os
 from pathlib import Path
 
-VERSION = "v1.0.5 fetch works"
+VERSION = "v1.0.8 Tag system"
+
 # --- Font Awesome Icon Setup ---
 # IMPORTANT: You need the Font Awesome Free font file 'fa-solid-900.ttf'.
 # Place it in the root directory of your project (your_project_folder/).
@@ -18,10 +19,13 @@ ICON_PLUS = "\uf067"
 ICON_MINUS = "\uf068"
 ICON_ARROW_LEFT = "\uf060"
 ICON_ARROW_RIGHT = "\uf061"
-ICON_BOLT = "\uf0e7" # New icon for "AI" or "power"
-ICON_BARS = "\uf0c9" # Three line menu (hamburger menu)
-ICON_SEARCH = "\uf002" # Search/magnifying glass icon
-ICON_HEART = "\uf004"  # Font Awesome solid heart icon
+ICON_BOLT = "\uf0e7"
+ICON_BARS = "\uf0c9"
+ICON_SEARCH = "\uf002"
+ICON_HEART = "\uf004"
+ICON_HEART_BROKEN = "\uf7a9"
+ICON_EYE = "\uf06e"
+ICON_EYE_SLASH = "\uf070"
 
 # New chart-specific icons
 ICON_CHART_LINE = "\uf201"  # Line chart icon for DPG charts
@@ -40,10 +44,11 @@ EXPANDED_WIDTH = 200
 # --- Global Font References (will be populated in main_app.py) ---
 default_font_id = None
 font_awesome_icon_font_id = None
+small_font_awesome_icon_font_id = None 
 
 # --- Helper to load fonts ---
 def load_fonts():
-    global default_font_id, font_awesome_icon_font_id
+    global default_font_id, font_awesome_icon_font_id, small_font_awesome_icon_font_id
 
     with dpg.font_registry():
         # Default font for most text
@@ -56,7 +61,7 @@ def load_fonts():
             dpg.add_font_range_hint(dpg.mvFontRangeHint_Default)
             default_font_id = default_font
 
-        # Font Awesome font for icons
+        # Font Awesome font for icons (regular size)
         if os.path.exists(FONT_AWESOME_PATH):
             try:
                 with dpg.font(FONT_AWESOME_PATH, 20) as fa_font:
@@ -65,10 +70,24 @@ def load_fonts():
                     dpg.add_font_range(0xf600, 0xf8ff)
                     dpg.add_font_range(0xf0000, 0x10ffff)
                     font_awesome_icon_font_id = fa_font
-                    print(f"Font Awesome font loaded from: {FONT_AWESOME_PATH}")
+                    print(f"Font Awesome font (size 20) loaded from: {FONT_AWESOME_PATH}")
+                
+                # Small Font Awesome font for smaller buttons
+                with dpg.font(FONT_AWESOME_PATH, 10) as small_fa_font:
+                    dpg.add_font_range(0xf000, 0xf2e0)
+                    dpg.add_font_range(0xf300, 0xf5ff)
+                    dpg.add_font_range(0xf600, 0xf8ff)
+                    dpg.add_font_range(0xf0000, 0x10ffff)
+                    small_font_awesome_icon_font_id = small_fa_font
+                    print(f"Font Awesome font (size 14) loaded from: {FONT_AWESOME_PATH}")
+                    
             except Exception as e:
                 print(f"Error loading Font Awesome font from '{FONT_AWESOME_PATH}': {e}")
                 print("Icons may not display correctly. Please ensure the font file is valid and accessible.")
+                font_awesome_icon_font_id = None
+                small_font_awesome_icon_font_id = None
         else:
             print(f"Error: Font Awesome font file '{FONT_AWESOME_PATH}' not found.")
             print("Please download 'fa-solid-900.ttf' and place it in the script directory or update the FONT_AWESOME_PATH.")
+            font_awesome_icon_font_id = None
+            small_font_awesome_icon_font_id = None

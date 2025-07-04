@@ -2,7 +2,6 @@ import dearpygui.dearpygui as dpg
 from utils import constants
 import random
 
-# Define stock_tags globally in this module
 stock_tags = []
 
 COLOR_PAIRS = [
@@ -46,6 +45,7 @@ class StockTag:
         self.parent = parent
         self.on_favorite = on_favorite
         self.on_remove = on_remove
+        self.is_visible = True  # Add this line
         self.create_box()
     
     def create_box(self):
@@ -66,49 +66,138 @@ class StockTag:
         with dpg.child_window(
             tag=self.tag_id,
             parent=self.parent,
-            width=100,
+            width=110,
             height=30,
             border=True,
             horizontal_scrollbar=False,
             no_scrollbar=True
-        ):
-            # Apply the theme to this specific child window
+            ):
+
             dpg.bind_item_theme(self.tag_id, theme_tag)
             
-            
-            # Stock name
-            dpg.add_text(self.stock_name, pos=[8, 5], color=text_color)
+            # Stock Name
+            dpg.add_text(self.stock_name, pos=[5, 5], color=text_color,tag=f"{self.tag_id}_font")
 
-            # Heart button
+            # Eye button (show/hide)
+            dpg.add_button(
+                label=constants.ICON_EYE,
+                tag=f"{self.tag_id}_eye",
+                width=18,
+                height=18,
+                pos=[40, 6],  # First button position
+                callback=self.toggle_eye
+            )
+            if hasattr(constants, 'font_awesome_icon_font_id') and constants.small_font_awesome_icon_font_id:
+                dpg.bind_item_font(f"{self.tag_id}_eye", constants.small_font_awesome_icon_font_id)
+
+            # Heart button (favorite)
             dpg.add_button(
                 label=constants.ICON_HEART,
                 tag=f"{self.tag_id}_heart",
-                width=20,
-                height=20,
-                pos=[50, 5],
+                width=18,
+                height=18,
+                pos=[62, 6],  # Second button position
                 callback=self.toggle_heart
             )
-            
+            if hasattr(constants, 'font_awesome_icon_font_id') and constants.small_font_awesome_icon_font_id:
+                dpg.bind_item_font(f"{self.tag_id}_heart", constants.small_font_awesome_icon_font_id)
+
             # Remove button
             dpg.add_button(
                 label="×",
                 tag=f"{self.tag_id}_remove",
-                width=20,
-                height=20,
-                pos=[72, 5],
+                width=18,
+                height=18,
+                pos=[114-30, 6],  # Third button position
                 callback=self.remove_tag
             )
     
     def toggle_heart(self):
         """Toggle heart state between empty and filled"""
         self.is_favorited = not self.is_favorited
-        heart_label = constants.ICON_HEART_FILLED if self.is_favorited else constants.ICON_HEART
+        if self.is_favorited:
+            heart_label = constants.ICON_HEART  # Solid heart
+        else:
+            heart_label = constants.ICON_HEART_BROKEN  # Broken heart
+        
         dpg.set_item_label(f"{self.tag_id}_heart", heart_label)
         
         print(f"{self.stock_name} favorite status: {self.is_favorited}")
         if self.on_favorite:
             self.on_favorite(self.stock_name, self.is_favorited)
     
+    def toggle_eye(self):
+        """Toggle eye state between visible and hidden"""
+        
+        # Toggle the visibility state
+        self.is_visible = not getattr(self, 'is_visible', True)
+        
+        # Update the eye icon based on visibility state
+        if self.is_visible:
+            eye_label = constants.ICON_EYE
+            print(f"{self.stock_name} is now visible")
+        else:
+            eye_label = constants.ICON_EYE_SLASH
+            print(f"{self.stock_name} is now hidden")
+        
+        # Update the button label
+        dpg.set_item_label(f"{self.tag_id}_eye", eye_label)
+        
+        # Optional: Change the appearance of the entire tag when hidden
+        if hasattr(self, 'on_visibility_change') and self.on_visibility_change:
+            self.on_visibility_change(self.stock_name, self.is_visible)
+        
+        # Optional: Fade out the tag when hidden
+        if not self.is_visible:
+            # Make the tag appear dimmed/faded
+            dpg.set_item_theme(self.tag_id, self._get_dimmed_theme())
+            dpg.configure_item(f"{self.tag_id}_text", color=[255, 255, 255])
+        else:
+            # Restore normal appearance
+            dpg.set_item_theme(self.tag_id, self._get_normal_theme())
+
+    def _get_dimmed_theme(self):
+        """Create a dimmed theme for hidden stocks"""
+        dimmed_theme_tag = f"dimmed_theme_{self.tag_id}"
+        
+        if not dpg.does_item_exist(dimmed_theme_tag):
+            with dpg.theme(tag=dimmed_theme_tag):
+                with dpg.theme_component(dpg.mvAll):
+                    # Get original colors but make them dimmer
+                    text_color, bg_color = get_color_pair_by_stock(self.stock_name)
+                    
+                    # Make colors more transparent/dimmed
+                    dimmed_bg = [int(c * 0.5) for c in bg_color] + [128]  # 50% opacity
+                    
+                    dpg.add_theme_color(dpg.mvThemeCol_WindowBg, dimmed_bg, category=dpg.mvThemeCat_Core)
+                    dpg.add_theme_color(dpg.mvThemeCol_ChildBg, dimmed_bg, category=dpg.mvThemeCat_Core)
+        
+        return dimmed_theme_tag
+
+    def _get_normal_theme(self):
+        """Get the normal theme for the stock tag"""
+        normal_theme_tag = f"normal_theme_{self.tag_id}"
+        
+        if not dpg.does_item_exist(normal_theme_tag):
+            with dpg.theme(tag=normal_theme_tag):
+                with dpg.theme_component(dpg.mvAll):
+                    text_color, bg_color = get_color_pair_by_stock(self.stock_name)
+                    bg_tuple = tuple(bg_color + [255])
+                    
+                    dpg.add_theme_color(dpg.mvThemeCol_WindowBg, bg_tuple, category=dpg.mvThemeCat_Core)
+                    dpg.add_theme_color(dpg.mvThemeCol_ChildBg, bg_tuple, category=dpg.mvThemeCat_Core)
+        
+        return normal_theme_tag
+
+    def get_visibility_status(self):
+        """Get current visibility status"""
+        return getattr(self, 'is_visible', True)
+
+    def set_visibility(self, visible):
+        """Programmatically set visibility state"""
+        if self.get_visibility_status() != visible:
+            self.toggle_eye()
+        
     def remove_tag(self):
         """Remove the stock tag from UI"""
         dpg.delete_item(self.tag_id)
@@ -128,6 +217,8 @@ class StockTag:
     def get_favorite_status(self):
         """Get current favorite status"""
         return self.is_favorited
+    
+# END OF CLASS DEF
 
 def add_stock_tag(stock_name, parent="tags_container"):
     """Add a new stock tag box"""
