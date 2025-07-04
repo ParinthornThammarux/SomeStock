@@ -84,4 +84,22 @@ PEG < 1 → Undervalued (good value for growth)
 
 PEG ≈ 1 → Fairly valued
 
-PEG > 1 → Overvalued (expensive relative to growth)
+
+# ---------------------------------------------------------------
+Aroon Indicator 
+ควรใชคู่กับ Rsi , MACD เป็นต้น
+- 🟢 Aroon Up > Aroon Down & > 50 = ขาขึ้น → อาจซื้อ
+
+- 🔴 Aroon Down > Aroon Up & > 50 = ขาลง → อาจขาย
+
+- ⚪ ทั้งคู่ < 50 = Sideway → รอจังหวะ
+ข้างล่างเป็นคำอธิบายเพิ่มเติมจ้า
+    สัญญาณซื้อ (Buy Signal):
+        Aroon Up ตัด Aroon Down ขึ้นจากด้านล่าง และ Aroon Up > 50
+            ✅ แนวโน้มกำลังเปลี่ยนเป็นขาขึ้น
+    สัญญาณขาย (Sell Signal):
+        Aroon Down ตัด Aroon Up ขึ้นจากด้านล่างและ Aroon Down > 50
+            ❌ แนวโน้มเปลี่ยนเป็นขาลง
+    สัญญาณพักตัว / ไม่เทรด (Hold):
+        ทั้ง Aroon Up และ Aroon Down ต่ำกว่า 50
+            📉 แนวโน้มอ่อนแรงหรือเข้าสู่โหมดสะสม

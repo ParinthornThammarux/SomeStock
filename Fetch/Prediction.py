@@ -368,6 +368,33 @@ def predict_aroon(symbol):
 
     latest_aroon_up = data['Aroon_Up'].iloc[-1]
     latest_aroon_down = data['Aroon_Down'].iloc[-1]
+    prev_aroon_up = data['Aroon_Up'].iloc[-2]
+    prev_aroon_down = data['Aroon_Down'].iloc[-2]
     print(f"📈 {symbol} - Latest Aroon Up: {latest_aroon_up:.2f}, Aroon Down: {latest_aroon_down:.2f}")
 
-    return latest_aroon_up, latest_aroon_down
+    signal = None
+    if prev_aroon_up < prev_aroon_down and latest_aroon_up > latest_aroon_down and latest_aroon_up > 50:
+        signal = "BUY"
+        print("✅ Buy Signal: Aroon Up crossed above Aroon Down and is strong (>50).")
+    elif prev_aroon_down < prev_aroon_up and latest_aroon_down > latest_aroon_up and latest_aroon_down > 50:
+        signal = "SELL"
+        print("❌ Sell Signal: Aroon Down crossed above Aroon Up and is strong (>50).")
+    else:
+        signal = "HOLD"
+        print("⚠️ No clear signal. Market may be sideways or indecisive.")
+    return latest_aroon_up, latest_aroon_down,signal
+
+def sushiroll(symbol):
+    data = fetch_data(symbol)
+    data.set_index('Date', inplace=True)
+
+    open = data['Open']
+    close = data['Close']
+
+    condi1  = close.shift(1) < open.shift(1)
+    condi2 = close > open
+    condi3 = open< close.shift(1)
+    condi4 = close > open.shift(1)
+
+    mpf.plot(data, type='candle', addplot=ap, volume=True, title=f"{symbol} Sushi Roll Reverse Pattern")
+    return condi1 & condi2 & condi3 & condi4

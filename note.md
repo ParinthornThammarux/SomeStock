@@ -25,6 +25,9 @@ requir lib
 13. filter and sort stock
 14. Tax Calculator ❗️
 15. simulation portfolio
+16. Risk Evaluation
+17. Finance and Fundamental Analyzer
+18. Group Indicator
 
 **Current Issue**
 1. slow peg ratio
