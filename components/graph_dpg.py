@@ -4,6 +4,7 @@ import dearpygui.dearpygui as dpg
 import math
 import random
 import time
+import pandas as pd
 
 from utils import constants
 from utils.stockdex_layer import fetch_data_from_stockdx
@@ -106,31 +107,19 @@ def create_main_graph(parent_tag, timestamp=None):
 
         # DEBUG BUTTONS - Add these for troubleshooting
         dpg.add_spacer(height=10)
-        dpg.add_separator()
-        dpg.add_text("Debug Tools:", color=[255, 255, 0])
-        
-        with dpg.group(horizontal=True):
-            dpg.add_input_text(width=100,hint="type symbol", tag="symbol")
-            dpg.add_spacer(width=5)
-            dpg.add_button(label="Fetch", 
-              callback=lambda: fetch_data_from_stockdx(
-                  dpg.get_value("symbol"), 
-                  current_stock_line_tag, 
-                  current_x_axis_tag, 
-                  current_y_axis_tag,
-                  current_plot_tag  
-              ))
-        dpg.add_spacer(height=20)
         
         # TABLE SECTION
         dpg.add_text("Stock Portfolio Data", color=[200, 255, 200])
         dpg.add_spacer(height=5)
         
         # Create table with unique tag - FIXED HEIGHT
+        global table_tag
         table_tag = f"portfolio_table_{timestamp}"
         table_container_tag = f"table_container_{timestamp}"
         
         with dpg.child_window(width=-1, height=-1, tag=table_container_tag, border=False):
+            global current_table_tag
+            current_table_tag = table_tag
             with dpg.table(
                 header_row=True,
                 borders_innerH=True,
@@ -141,43 +130,16 @@ def create_main_graph(parent_tag, timestamp=None):
                 height=-1,
                 scrollY=False
             ):
-                # Table columns
+                # NEW TABLE COLUMNS - Updated to match stockdx data
                 dpg.add_table_column(label="Symbol", width_fixed=True, init_width_or_weight=80)
                 dpg.add_table_column(label="Company", width_fixed=True, init_width_or_weight=200)
                 dpg.add_table_column(label="Price", width_fixed=True, init_width_or_weight=100)
                 dpg.add_table_column(label="Change", width_fixed=True, init_width_or_weight=100)
                 dpg.add_table_column(label="Volume", width_fixed=True, init_width_or_weight=100)
-                dpg.add_table_column(label="Market Cap", width_fixed=True, init_width_or_weight=120)
+                dpg.add_table_column(label="Revenue", width_fixed=True, init_width_or_weight=120)  # From income statement
+                dpg.add_table_column(label="Net Income", width_fixed=True, init_width_or_weight=120)  # From income statement
+                dpg.add_table_column(label="Cash Flow", width_fixed=True, init_width_or_weight=120)  # From cash flow
                 
-                # Demo stock data
-                demo_stocks = [
-                    ("AAPL", "Apple Inc.", 175.43, 2.15, "64.2M", "2.75T"),
-                    ("GOOGL", "Alphabet Inc.", 2431.50, -15.23, "1.2M", "1.63T"),
-                    ("MSFT", "Microsoft Corp.", 338.25, 5.67, "23.1M", "2.52T"),
-                    ("AMZN", "Amazon.com Inc.", 3102.97, -45.12, "3.8M", "1.57T"),
-                    ("TSLA", "Tesla Inc.", 248.50, 12.34, "89.5M", "789B"),
-                    ("META", "Meta Platforms", 297.55, -8.91, "18.7M", "754B"),
-                    ("NVDA", "NVIDIA Corp.", 421.13, 18.76, "45.2M", "1.04T"),
-                    ("NFLX", "Netflix Inc.", 384.29, -2.45, "8.9M", "171B"),
-                    ("CRM", "Salesforce Inc.", 198.76, 4.23, "5.6M", "196B"),
-                    ("PYPL", "PayPal Holdings", 62.85, -1.78, "12.3M", "70.8B")
-                ]
-                
-                # Add table rows
-                for symbol, company, price, change, volume, market_cap in demo_stocks:
-                    with dpg.table_row():
-                        dpg.add_text(symbol)
-                        dpg.add_text(company)
-                        dpg.add_text(f"${price:.2f}")
-                        
-                        # Color-coded change
-                        change_color = [0, 255, 0] if change >= 0 else [255, 0, 0]
-                        change_text = f"+${change:.2f}" if change >= 0 else f"${change:.2f}"
-                        dpg.add_text(change_text, color=change_color)
-                        
-                        dpg.add_text(volume)
-                        dpg.add_text(market_cap)
-        
         # Action buttons
         dpg.add_spacer(height=15)
         
@@ -312,3 +274,167 @@ def go_to_welcome():
 def create_graph_table_page(parent_tag):
     """Legacy function - redirects to new system"""
     return create_main_graph(parent_tag)
+
+def add_stock_to_portfolio_table(symbol):
+    """Add a new stock row to the portfolio table with real stockdx financial data"""
+    global current_table_tag
+    
+    try:
+        if not current_table_tag or not dpg.does_item_exist(current_table_tag):
+            print("❌ Portfolio table not found")
+            return
+            
+        from components.stock_tag import find_tag_by_name
+        print(f"Symbol search : {symbol}")
+        stock_tag = find_tag_by_name(symbol)
+        company_name = stock_tag.get_company_name() if stock_tag else f"{symbol} Corp."
+        print (f"Company_name : {company_name}")
+        from stockdex import Ticker
+        from datetime import datetime
+        ticker = Ticker(ticker=symbol)
+        
+        print(f"📊 Fetching comprehensive data for {symbol}...")
+        
+        # Get current price data
+        price_data = ticker.yahoo_api_price(range='2d', dataGranularity='1d')
+        
+        if price_data is None or price_data.empty:
+            print(f"❌ No price data available for {symbol}")
+            return
+            
+        # Extract price and volume data
+        current_price = price_data['close'].iloc[-1]
+        volume = price_data['volume'].iloc[-1] if 'volume' in price_data.columns else 0
+        
+        # Calculate change
+        if len(price_data) > 1:
+            previous_price = price_data['close'].iloc[-2]
+            change = current_price - previous_price
+        else:
+            change = 0
+        
+        # Initialize financial metrics
+        revenue = "N/A"
+        net_income = "N/A"
+        cash_flow_value = "N/A"
+        
+        # Get fundamental data
+        try:
+            print(f"📋 Fetching fundamental data for {symbol}...")
+            
+            income_statement = ticker.yahoo_api_income_statement(frequency='quarterly')
+            cash_flow = ticker.yahoo_api_cash_flow(format='raw')
+            balance_sheet = ticker.yahoo_api_balance_sheet(period1=datetime(2020, 1, 1))
+            financials = ticker.yahoo_api_financials(period1=datetime(2022, 1, 1), period2=datetime.today())
+            
+            # Extract revenue from income statement (using actual column names from your data)
+            if income_statement is not None and not income_statement.empty:
+                # Look for revenue in the most recent quarter (last row)
+                latest_quarter = income_statement.index[-1]  # Get most recent quarter
+                
+                # Try different possible revenue column names
+                revenue_columns = ['quarterlyTotalRevenue', 'quarterlyRevenue', 'quarterlyOperatingRevenue']
+                for col in revenue_columns:
+                    if col in income_statement.columns:
+                        rev_value = income_statement.loc[latest_quarter, col]
+                        if pd.notna(rev_value) and rev_value != 0:
+                            if isinstance(rev_value, str) and 'M' in rev_value:
+                                revenue = rev_value  # Already formatted
+                            elif isinstance(rev_value, (int, float)):
+                                revenue = f"${rev_value/1_000_000:.1f}M" if rev_value >= 1_000_000 else f"${rev_value/1_000:.1f}K"
+                            break
+            
+            # Extract net income from income statement
+            if income_statement is not None and not income_statement.empty:
+                latest_quarter = income_statement.index[-1]
+                
+                # Try different net income column names
+                net_income_columns = ['quarterlyNetIncome', 'quarterlyNormalizedIncome', 'quarterlyBasicEPS']
+                for col in net_income_columns:
+                    if col in income_statement.columns:
+                        ni_value = income_statement.loc[latest_quarter, col]
+                        if pd.notna(ni_value) and ni_value != 0:
+                            if isinstance(ni_value, str) and ('M' in ni_value or 'B' in ni_value):
+                                net_income = ni_value  # Already formatted
+                            elif isinstance(ni_value, (int, float)):
+                                if col == 'quarterlyBasicEPS':
+                                    net_income = f"${ni_value:.2f} EPS"  # EPS format
+                                else:
+                                    net_income = f"${ni_value/1_000_000:.1f}M" if abs(ni_value) >= 1_000_000 else f"${ni_value/1_000:.1f}K"
+                            break
+            
+            # Extract operating cash flow from cash flow statement
+            if cash_flow is not None and not cash_flow.empty:
+                latest_year = cash_flow.index[-1]  # Most recent year
+                
+                # Try different cash flow column names
+                cf_columns = ['annualOperatingCashFlow', 'annualTotalCashFromOperatingActivities', 'annualCashFromOperations']
+                for col in cf_columns:
+                    if col in cash_flow.columns:
+                        cf_value = cash_flow.loc[latest_year, col]
+                        if pd.notna(cf_value) and cf_value != 0:
+                            if isinstance(cf_value, str) and ('M' in cf_value or 'B' in cf_value):
+                                cash_flow_value = cf_value  # Already formatted
+                            elif isinstance(cf_value, (int, float)):
+                                cash_flow_value = f"${cf_value/1_000_000:.1f}M" if abs(cf_value) >= 1_000_000 else f"${cf_value/1_000:.1f}K"
+                            break
+            
+            print(f"✅ Retrieved fundamental data for {symbol}")
+            print(f"   Revenue: {revenue}, Net Income: {net_income}, Cash Flow: {cash_flow_value}")
+            
+        except Exception as e:
+            print(f"⚠️ Could not fetch fundamental data for {symbol}: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # Format volume
+        if isinstance(volume, (int, float)) and volume > 0:
+            if volume >= 1_000_000_000:
+                volume_str = f"{volume/1_000_000_000:.1f}B"
+            elif volume >= 1_000_000:
+                volume_str = f"{volume/1_000_000:.1f}M"
+            elif volume >= 1_000:
+                volume_str = f"{volume/1_000:.1f}K"
+            else:
+                volume_str = str(int(volume))
+        else:
+            volume_str = "N/A"
+        
+        # Add new row to the table
+        with dpg.table_row(parent=current_table_tag):
+            dpg.add_text(symbol)
+            dpg.add_text(company_name[:20] + "..." if len(company_name) > 20 else company_name)
+            dpg.add_text(f"${current_price:.2f}")
+            
+            # Color-coded change
+            change_color = [0, 255, 0] if change >= 0 else [255, 0, 0]
+            change_text = f"+${change:.2f}" if change >= 0 else f"${change:.2f}"
+            dpg.add_text(change_text, color=change_color)
+            
+            dpg.add_text(volume_str)
+            dpg.add_text(revenue)
+            
+            # Color-code net income (green for positive, red for negative)
+            ni_color = [255, 255, 255]  # Default white
+            if net_income != "N/A":
+                if "EPS" in net_income:
+                    # For EPS, positive is green
+                    try:
+                        eps_val = float(net_income.replace("$", "").replace(" EPS", ""))
+                        ni_color = [0, 255, 0] if eps_val > 0 else [255, 0, 0]
+                    except:
+                        pass
+                elif not net_income.startswith("-"):
+                    ni_color = [0, 255, 0]
+                else:
+                    ni_color = [255, 0, 0]
+            
+            dpg.add_text(net_income, color=ni_color)
+            dpg.add_text(cash_flow_value)
+        
+        print(f"✅ Added {symbol} to portfolio table with real financial data")
+        
+    except Exception as e:
+        print(f"❌ Failed to add {symbol} to table: {e}")
+        import traceback
+        traceback.print_exc()

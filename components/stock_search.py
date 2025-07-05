@@ -176,7 +176,7 @@ def typing_callback():
             
 def row_clicked(stock_data):
     #print(f"Selected stock: {stock_data['symbol']} - {stock_data['company_name']}")
-    add_stock_tag(stock_data['symbol'])
+    add_stock_tag(stock_data['symbol'],stock_data['company_name'])
     if dpg.does_item_exist("stock_search_popup"):
         dpg.delete_item("stock_search_popup")
         
