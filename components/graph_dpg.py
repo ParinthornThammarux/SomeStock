@@ -299,7 +299,6 @@ def add_stock_to_portfolio_table(symbol):
         # Get current price data (includes volume)
         price_data = ticker.yahoo_api_price(range='2d', dataGranularity='1d')
         
-        ticker.yahoo_web_earnings_history()
         if price_data is None or price_data.empty:
             print(f"❌ No price data available for {symbol}")
             return
