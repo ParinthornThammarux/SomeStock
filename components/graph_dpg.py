@@ -276,28 +276,30 @@ def create_graph_table_page(parent_tag):
     return create_main_graph(parent_tag)
 
 def add_stock_to_portfolio_table(symbol):
-    """Add a new stock row to the portfolio table with real stockdx financial data"""
+    """Add a new stock row to the portfolio table using Yahoo API data"""
     global current_table_tag
     
     try:
         if not current_table_tag or not dpg.does_item_exist(current_table_tag):
             print("❌ Portfolio table not found")
             return
-            
+        
+        # Get company name from the stock tag
         from components.stock_tag import find_tag_by_name
-        print(f"Symbol search : {symbol}")
         stock_tag = find_tag_by_name(symbol)
         company_name = stock_tag.get_company_name() if stock_tag else f"{symbol} Corp."
-        print (f"Company_name : {company_name}")
+        
         from stockdex import Ticker
         from datetime import datetime
+        import pandas as pd
         ticker = Ticker(ticker=symbol)
         
-        print(f"📊 Fetching comprehensive data for {symbol}...")
+        print(f"📊 Fetching Yahoo API data for {symbol} ({company_name})...")
         
-        # Get current price data
+        # Get current price data (includes volume)
         price_data = ticker.yahoo_api_price(range='2d', dataGranularity='1d')
         
+        ticker.yahoo_web_earnings_history()
         if price_data is None or price_data.empty:
             print(f"❌ No price data available for {symbol}")
             return
@@ -318,72 +320,58 @@ def add_stock_to_portfolio_table(symbol):
         net_income = "N/A"
         cash_flow_value = "N/A"
         
-        # Get fundamental data
+        # Get fundamental data using Yahoo API
         try:
-            print(f"📋 Fetching fundamental data for {symbol}...")
+            print(f"📋 Fetching Yahoo API fundamental data for {symbol}...")
             
-            income_statement = ticker.yahoo_api_income_statement(frequency='quarterly')
-            cash_flow = ticker.yahoo_api_cash_flow(format='raw')
-            balance_sheet = ticker.yahoo_api_balance_sheet(period1=datetime(2020, 1, 1))
-            financials = ticker.yahoo_api_financials(period1=datetime(2022, 1, 1), period2=datetime.today())
+            # Get quarterly financial data
+            income_statement = ticker.yahoo_api_income_statement(frequency='quarterly', format='raw')
+            cash_flow = ticker.yahoo_api_cash_flow(frequency='quarterly', format='raw')
             
-            # Extract revenue from income statement (using actual column names from your data)
+            # Extract Revenue (Total Revenue)
             if income_statement is not None and not income_statement.empty:
-                # Look for revenue in the most recent quarter (last row)
-                latest_quarter = income_statement.index[-1]  # Get most recent quarter
-                
-                # Try different possible revenue column names
-                revenue_columns = ['quarterlyTotalRevenue', 'quarterlyRevenue', 'quarterlyOperatingRevenue']
-                for col in revenue_columns:
-                    if col in income_statement.columns:
-                        rev_value = income_statement.loc[latest_quarter, col]
-                        if pd.notna(rev_value) and rev_value != 0:
-                            if isinstance(rev_value, str) and 'M' in rev_value:
-                                revenue = rev_value  # Already formatted
-                            elif isinstance(rev_value, (int, float)):
-                                revenue = f"${rev_value/1_000_000:.1f}M" if rev_value >= 1_000_000 else f"${rev_value/1_000:.1f}K"
-                            break
+                if 'quarterlyTotalRevenue' in income_statement.columns:
+                    latest_quarter_idx = income_statement.index[-1]
+                    rev_value = income_statement.loc[latest_quarter_idx, 'quarterlyTotalRevenue']
+                    if pd.notna(rev_value) and rev_value != 0:
+                        rev_value = float(rev_value)
+                        revenue = f"${rev_value/1_000_000:.1f}M" if rev_value >= 1_000_000 else f"${rev_value/1_000:.1f}K"
             
-            # Extract net income from income statement
+            # Extract Net Income
             if income_statement is not None and not income_statement.empty:
-                latest_quarter = income_statement.index[-1]
-                
-                # Try different net income column names
-                net_income_columns = ['quarterlyNetIncome', 'quarterlyNormalizedIncome', 'quarterlyBasicEPS']
-                for col in net_income_columns:
+                net_income_col = None
+                for col in ['quarterlyNetIncome', 'quarterlyNetIncomeCommonStockholders']:
                     if col in income_statement.columns:
-                        ni_value = income_statement.loc[latest_quarter, col]
-                        if pd.notna(ni_value) and ni_value != 0:
-                            if isinstance(ni_value, str) and ('M' in ni_value or 'B' in ni_value):
-                                net_income = ni_value  # Already formatted
-                            elif isinstance(ni_value, (int, float)):
-                                if col == 'quarterlyBasicEPS':
-                                    net_income = f"${ni_value:.2f} EPS"  # EPS format
-                                else:
-                                    net_income = f"${ni_value/1_000_000:.1f}M" if abs(ni_value) >= 1_000_000 else f"${ni_value/1_000:.1f}K"
-                            break
+                        net_income_col = col
+                        break
+                
+                if net_income_col:
+                    latest_quarter_idx = income_statement.index[-1]
+                    ni_value = income_statement.loc[latest_quarter_idx, net_income_col]
+                    if pd.notna(ni_value) and ni_value != 0:
+                        ni_value = float(ni_value)
+                        net_income = f"${ni_value/1_000_000:.1f}M" if abs(ni_value) >= 1_000_000 else f"${ni_value/1_000:.1f}K"
             
-            # Extract operating cash flow from cash flow statement
+            # Extract Operating Cash Flow
             if cash_flow is not None and not cash_flow.empty:
-                latest_year = cash_flow.index[-1]  # Most recent year
-                
-                # Try different cash flow column names
-                cf_columns = ['annualOperatingCashFlow', 'annualTotalCashFromOperatingActivities', 'annualCashFromOperations']
-                for col in cf_columns:
+                cf_col = None
+                for col in ['quarterlyOperatingCashFlow', 'quarterlyFreeCashFlow']:
                     if col in cash_flow.columns:
-                        cf_value = cash_flow.loc[latest_year, col]
-                        if pd.notna(cf_value) and cf_value != 0:
-                            if isinstance(cf_value, str) and ('M' in cf_value or 'B' in cf_value):
-                                cash_flow_value = cf_value  # Already formatted
-                            elif isinstance(cf_value, (int, float)):
-                                cash_flow_value = f"${cf_value/1_000_000:.1f}M" if abs(cf_value) >= 1_000_000 else f"${cf_value/1_000:.1f}K"
-                            break
+                        cf_col = col
+                        break
+                
+                if cf_col:
+                    latest_quarter_idx = cash_flow.index[-1]
+                    cf_value = cash_flow.loc[latest_quarter_idx, cf_col]
+                    if pd.notna(cf_value) and cf_value != 0:
+                        cf_value = float(cf_value)
+                        cash_flow_value = f"${cf_value/1_000_000:.1f}M" if abs(cf_value) >= 1_000_000 else f"${cf_value/1_000:.1f}K"
             
-            print(f"✅ Retrieved fundamental data for {symbol}")
+            print(f"✅ Retrieved Yahoo API data for {symbol}")
             print(f"   Revenue: {revenue}, Net Income: {net_income}, Cash Flow: {cash_flow_value}")
             
         except Exception as e:
-            print(f"⚠️ Could not fetch fundamental data for {symbol}: {e}")
+            print(f"⚠️ Could not fetch Yahoo API fundamental data for {symbol}: {e}")
             import traceback
             traceback.print_exc()
         
@@ -414,25 +402,17 @@ def add_stock_to_portfolio_table(symbol):
             dpg.add_text(volume_str)
             dpg.add_text(revenue)
             
-            # Color-code net income (green for positive, red for negative)
+            # Color-code net income
             ni_color = [255, 255, 255]  # Default white
-            if net_income != "N/A":
-                if "EPS" in net_income:
-                    # For EPS, positive is green
-                    try:
-                        eps_val = float(net_income.replace("$", "").replace(" EPS", ""))
-                        ni_color = [0, 255, 0] if eps_val > 0 else [255, 0, 0]
-                    except:
-                        pass
-                elif not net_income.startswith("-"):
-                    ni_color = [0, 255, 0]
-                else:
-                    ni_color = [255, 0, 0]
+            if net_income != "N/A" and not net_income.startswith("-"):
+                ni_color = [0, 255, 0]  # Green for positive
+            elif net_income != "N/A":
+                ni_color = [255, 0, 0]  # Red for negative
             
             dpg.add_text(net_income, color=ni_color)
             dpg.add_text(cash_flow_value)
         
-        print(f"✅ Added {symbol} to portfolio table with real financial data")
+        print(f"✅ Added {symbol} ({company_name}) with Yahoo API financial data")
         
     except Exception as e:
         print(f"❌ Failed to add {symbol} to table: {e}")
