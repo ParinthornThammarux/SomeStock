@@ -305,23 +305,22 @@ def create_user():
     pin = str(dpg.get_value("new_pin")).strip()
     
     try:
-        # Hash passwords for security (you might want to use a more secure method)
         password_hash = hashlib.sha256(password.encode()).hexdigest()
         pin_hash = hashlib.sha256(pin.encode()).hexdigest()
         
-        # Here you would save to your database/file
-        # For demonstration, we'll just print and show success
         print(f"User created successfully:")
         print(f"  Username: {username}")
         print(f"  Password Hash: {password_hash[:20]}...")
         print(f"  PIN Hash: {pin_hash[:20]}...")
         save_user_registration(username,password_hash,pin_hash)
         
-
-        
-        # Disable the create button to prevent duplicate creation
         dpg.configure_item("create_btn", enabled=False)
         
+        i = 0
+        while i < 300:
+            i += 1
+            time.sleep(0.01)
+        clear_form()
         # Auto-clear form after 3 seconds (optional)
         # You could implement a timer here if desired
         
