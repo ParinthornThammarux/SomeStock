@@ -53,9 +53,7 @@ class StockTag:
         self.on_favorite = on_favorite
         self.on_remove = on_remove
         self.create_box()
-        # Auto-focus this new tag after creation
         self.set_focus(True)
-        # NOTE: Don't call add_stock_to_table here - it should be called after the tag is added to stock_tags list
     
     def create_box(self):
         """Create the styled stock tag as a rectangular box"""
@@ -63,11 +61,13 @@ class StockTag:
         
         # Create themes for normal and focused states
         self._create_themes(text_color, bg_color)
-        
+        symbol_len = len(self.symbol)
+        print(f"len = {symbol_len}")
+        shift = 7
         with dpg.child_window(
             tag=self.tag_id,
             parent=self.parent,
-            width=110,
+            width=110 + max(0,((symbol_len - 4) * shift)),
             height=30,
             border=True,
             horizontal_scrollbar=False,
@@ -85,7 +85,7 @@ class StockTag:
                 tag=f"{self.tag_id}_chart",
                 width=18,
                 height=18,
-                pos=[40, 6],
+                pos=[40 + max(0,((symbol_len - 4) * shift)), 6],
                 callback=self.push_chart
             )
             if hasattr(constants, 'small_font_awesome_icon_font_id') and constants.small_font_awesome_icon_font_id:
@@ -97,7 +97,7 @@ class StockTag:
                 tag=f"{self.tag_id}_heart",
                 width=18,
                 height=18,
-                pos=[62, 6],
+                pos=[62 + max(0,((symbol_len - 4) * shift)), 6],
                 callback=self.toggle_heart
             )
             if hasattr(constants, 'small_font_awesome_icon_font_id') and constants.small_font_awesome_icon_font_id:
@@ -109,7 +109,7 @@ class StockTag:
                 tag=f"{self.tag_id}_remove",
                 width=18,
                 height=18,
-                pos=[84, 6],
+                pos=[84 + max(0,((symbol_len - 4) * shift)), 6],
                 callback=self.remove_tag
             )
     

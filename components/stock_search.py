@@ -61,7 +61,9 @@ def create_stock_search(line_tag, x_axis_tag, y_axis_tag, plot_tag):
         dpg.add_separator()
         dpg.add_spacer(height=3)
         with dpg.group(horizontal=True):
-            dpg.add_input_text(tag='stock_name', hint="ie. AAPL, TSLA", width=280, callback=typing_callback)
+            with dpg.group(horizontal=True):
+                dpg.add_input_text(tag='stock_name', hint="ie. AAPL, TSLA", width=280, callback=typing_callback)
+                dpg.add_button(label="Search", width=60, callback=search_callback)
             dpg.add_text("Click on stock to search", color=[242, 226, 5])
         # Table with 4 columns
         with dpg.table(header_row=True, tag="stock_results_table", borders_innerH=True, borders_outerH=True, 
@@ -71,11 +73,20 @@ def create_stock_search(line_tag, x_axis_tag, y_axis_tag, plot_tag):
             dpg.add_table_column(label="Industry", width_fixed=False, init_width_or_weight=100)
             dpg.add_table_column(label="Market Cap", width_fixed=False, init_width_or_weight=100)
 
-        dpg.add_button(label="Search", width=60, callback=search_callback)
-
 def search_callback():
-    symbol = dpg.get_value('stock_name')
+    symbol = dpg.get_value('stock_name').strip().upper()
     print(f"Searching for: {symbol}")
+    
+    if symbol:
+        # Create a stock_data dict for manual entry with empty company name
+        manual_stock_data = {
+            'symbol': symbol,
+            'company_name': ""  # Empty company name
+        }
+        
+        # Call row_clicked with the properly formatted data
+        row_clicked(manual_stock_data)
+    
     # Close the popup
     if dpg.does_item_exist("stock_search_popup"):
         dpg.delete_item("stock_search_popup")
@@ -176,10 +187,11 @@ def typing_callback():
             
 def row_clicked(stock_data):
     #print(f"Selected stock: {stock_data['symbol']} - {stock_data['company_name']}")
-    add_stock_tag(stock_data['symbol'],stock_data['company_name'])
     if dpg.does_item_exist("stock_search_popup"):
         dpg.delete_item("stock_search_popup")
         
+    add_stock_tag(stock_data['symbol'],stock_data['company_name'])
+
     # fetch and display data (move to inside create stock tag?)
     fetch_data_from_stockdx(
         stock_data['symbol'],

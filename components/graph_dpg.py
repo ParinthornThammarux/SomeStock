@@ -296,16 +296,33 @@ def add_stock_to_portfolio_table(symbol):
         
         print(f"📊 Fetching Yahoo API data for {symbol} ({company_name})...")
         
-        # Get current price data (includes volume)
-        price_data = ticker.yahoo_api_price(range='2d', dataGranularity='1d')
+        # Get current price data (includes volume) - FIXED: Use longer range for better data
+        price_data = ticker.yahoo_api_price(range='5d', dataGranularity='1d')
         
         if price_data is None or price_data.empty:
             print(f"❌ No price data available for {symbol}")
             return
             
+        # FIXED: Better volume extraction with debug info
+        print(f"📊 Price data columns: {price_data.columns.tolist()}")
+        print(f"📊 Price data shape: {price_data.shape}")
+        
         # Extract price and volume data
         current_price = price_data['close'].iloc[-1]
-        volume = price_data['volume'].iloc[-1] if 'volume' in price_data.columns else 0
+        
+        # FIXED: Better volume handling
+        volume = 0
+        if 'volume' in price_data.columns:
+            volume_series = price_data['volume']
+            # Get the most recent non-null volume
+            non_null_volumes = volume_series.dropna()
+            if not non_null_volumes.empty:
+                volume = non_null_volumes.iloc[-1]
+                print(f"📊 Volume found: {volume:,}")
+            else:
+                print("⚠️ No valid volume data found")
+        else:
+            print("⚠️ Volume column not found in price data")
         
         # Calculate change
         if len(price_data) > 1:
@@ -330,11 +347,21 @@ def add_stock_to_portfolio_table(symbol):
             # Extract Revenue (Total Revenue)
             if income_statement is not None and not income_statement.empty:
                 if 'quarterlyTotalRevenue' in income_statement.columns:
+                    print("✅ Found quarterlyTotalRevenue column")
                     latest_quarter_idx = income_statement.index[-1]
+                    print(f"📊 Latest quarter index: {latest_quarter_idx}")
                     rev_value = income_statement.loc[latest_quarter_idx, 'quarterlyTotalRevenue']
+                    print(f"📊 Raw revenue value: {rev_value} (type: {type(rev_value)})")
+                    
                     if pd.notna(rev_value) and rev_value != 0:
+                        print("✅ Revenue value is valid (not NaN and not zero)")
                         rev_value = float(rev_value)
                         revenue = f"${rev_value/1_000_000:.1f}M" if rev_value >= 1_000_000 else f"${rev_value/1_000:.1f}K"
+                        print(f"📊 Formatted revenue: {revenue}")
+                    else:
+                        print(f"❌ Revenue value is invalid: NaN={pd.isna(rev_value)}, Zero={rev_value == 0}")
+            else:
+                print("❌ Income statement is None or empty")
             
             # Extract Net Income
             if income_statement is not None and not income_statement.empty:
@@ -366,26 +393,33 @@ def add_stock_to_portfolio_table(symbol):
                         cf_value = float(cf_value)
                         cash_flow_value = f"${cf_value/1_000_000:.1f}M" if abs(cf_value) >= 1_000_000 else f"${cf_value/1_000:.1f}K"
             
-            print(f"✅ Retrieved Yahoo API data for {symbol}")
-            print(f"   Revenue: {revenue}, Net Income: {net_income}, Cash Flow: {cash_flow_value}")
-            
+            print(f"✅ Retrieved Yahoo API data for {symbol}")            
         except Exception as e:
             print(f"⚠️ Could not fetch Yahoo API fundamental data for {symbol}: {e}")
             import traceback
             traceback.print_exc()
         
-        # Format volume
-        if isinstance(volume, (int, float)) and volume > 0:
-            if volume >= 1_000_000_000:
-                volume_str = f"{volume/1_000_000_000:.1f}B"
-            elif volume >= 1_000_000:
-                volume_str = f"{volume/1_000_000:.1f}M"
-            elif volume >= 1_000:
-                volume_str = f"{volume/1_000:.1f}K"
-            else:
-                volume_str = str(int(volume))
+        # FIXED: Better volume formatting with proper type checking
+        volume_str = "N/A"
+        if volume is not None and pd.notna(volume):
+            try:
+                volume_num = float(volume)
+                if volume_num > 0:
+                    if volume_num >= 1_000_000_000:
+                        volume_str = f"{volume_num/1_000_000_000:.1f}B"
+                    elif volume_num >= 1_000_000:
+                        volume_str = f"{volume_num/1_000_000:.1f}M"
+                    elif volume_num >= 1_000:
+                        volume_str = f"{volume_num/1_000:.1f}K"
+                    else:
+                        volume_str = f"{int(volume_num):,}"
+                    print(f"📊 Formatted volume: {volume_str}")
+                else:
+                    print("⚠️ Volume is zero or negative")
+            except (ValueError, TypeError) as e:
+                print(f"⚠️ Could not format volume: {e}")
         else:
-            volume_str = "N/A"
+            print("⚠️ Volume is None or NaN")
         
         # Add new row to the table
         with dpg.table_row(parent=current_table_tag):
