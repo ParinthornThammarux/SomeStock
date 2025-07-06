@@ -86,6 +86,10 @@ def icon_button_callback(sender, app_data, user_data):
         show_page("page_b")
     elif sender == "remove_icon_btn" or button_label == "Remove Item":
         show_page("page_b")
+    elif sender == "Indicator_icon_btn" or button_label == "Indicator":
+        # Import here to avoid circular import issues
+        from pages.Indicator_page import Create_Indicator_page
+        Create_Indicator_page("page_content_container")
 
 def main():
     dpg.create_context()

@@ -50,5 +50,8 @@ def create_sidebar(parent_tag, toggle_callback, icon_button_callback, initial_wi
 
                 dpg.add_button(label=constants.ICON_MINUS, width=-1, callback=icon_button_callback, tag="remove_icon_btn")
                 dpg.bind_item_font("remove_icon_btn", constants.font_awesome_icon_font_id)
+
+                dpg.add_button(label=constants.ICON_CALCULATOR, width=-1, callback=icon_button_callback, tag="Indicator_icon_btn")
+                dpg.bind_item_font("Indicator_icon_btn", constants.font_awesome_icon_font_id)
             else:
                 dpg.add_text("Icons not loaded. Check console for errors.", color=[255,0,0])

@@ -59,6 +59,12 @@ def show_page(page_name):
         current_page = "user_management"
         create_user_management_content("page_content_container")
         print("Loaded User_create")
+    elif page_name == "indicator":
+        # Import here to avoid circular import issues
+        from pages.Indicator_page import Create_Indicator_page
+        Create_Indicator_page("page_content_container")
+        current_page = "indicator"
+        print("Loaded indicator page content")
     else:
         # Default fallback
         dpg.add_text("Page not found", parent="page_content_container", color=[255, 0, 0])
