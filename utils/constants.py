@@ -4,7 +4,7 @@ import dearpygui.dearpygui as dpg
 import os
 from pathlib import Path
 
-VERSION = "v1.0.8 Tag system"
+VERSION = "v1.1.0 Table loaded and Indicator imported"
 
 # --- Font Awesome Icon Setup ---
 # IMPORTANT: You need the Font Awesome Free font file 'fa-solid-900.ttf'.
@@ -44,7 +44,11 @@ EXPANDED_WIDTH = 200
 # --- Global Font References (will be populated in main_app.py) ---
 default_font_id = None
 font_awesome_icon_font_id = None
-small_font_awesome_icon_font_id = None 
+small_font_awesome_icon_font_id = None
+
+# --- SET screen size
+WinW = 1400
+WinH = 800
 
 # --- Helper to load fonts ---
 def load_fonts():

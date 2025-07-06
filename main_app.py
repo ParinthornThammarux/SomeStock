@@ -5,6 +5,7 @@ import time
 from components.sidebar import create_sidebar
 from containers.container_content import create_main_content, show_page
 from components.stock_search import load_stock_data
+from components.topbar_stuff import create_top_menu
 from utils import constants
 
 # --- Animation State Variables ---
@@ -80,7 +81,7 @@ def icon_button_callback(sender, app_data, user_data):
     elif sender == "search_icon_btn" or button_label == "Search":
         show_page("page_b")
     elif sender == "portfolio_icon_btn" or button_label == "Portfolio":
-        show_page("page_b")  # main as forback
+        show_page("welcome")  # main as forback
     elif sender == "add_icon_btn" or button_label == "Add Item":
         show_page("page_b")
     elif sender == "remove_icon_btn" or button_label == "Remove Item":
@@ -88,13 +89,14 @@ def icon_button_callback(sender, app_data, user_data):
 
 def main():
     dpg.create_context()
-    dpg.create_viewport(title='SomeStock', width=1400, height=800, x_pos=0, y_pos=0, vsync=True)
+    dpg.create_viewport(title='SomeStock', width=constants.WinW, height=constants.WinH, x_pos=0, y_pos=0, vsync=True)
 
     constants.load_fonts()
     dpg.setup_dearpygui()
     dpg.set_viewport_vsync(True)
     with dpg.window(tag="main_window", label="SomeStock", autosize=True, no_resize=True, 
                     no_collapse=True, no_move=True, no_title_bar=True):
+        create_top_menu()
         with dpg.group(horizontal=True, tag="root_group"):
             create_sidebar(
                 parent_tag="root_group",
@@ -102,8 +104,8 @@ def main():
                 icon_button_callback=icon_button_callback,
                 initial_width=constants.COLLAPSED_WIDTH  
             )
-            
             create_main_content(parent_tag="root_group")
+            
     load_stock_data()
     dpg.set_primary_window("main_window", True)
     dpg.show_viewport()

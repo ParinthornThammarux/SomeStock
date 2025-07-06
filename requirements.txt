@@ -1,5 +1,3 @@
-# pip install -r requirements.txt
-
 # Core GUI Framework
 dearpygui>=1.11.1
 
@@ -9,6 +7,10 @@ numpy>=1.24.0
 matplotlib>=3.7.0
 plotly>=5.17.0
 kaleido>=0.2.1
+
+# Web Scraping and HTML Parsing
+beautifulsoup4>=4.12.0
+requests>=2.31.0
 
 # Image Processing
 Pillow>=10.0.0
