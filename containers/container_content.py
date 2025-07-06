@@ -3,6 +3,7 @@
 # Wraps everything on the right side (excluding sidebar) 
 
 import dearpygui.dearpygui as dpg
+from components.user.create_user import create_user_management_content
 from pages.welcome_page import create_welcome_content
 from pages.example_page_b import create_example_page_b_content
 from components.graph_dpg import create_main_graph
@@ -54,12 +55,17 @@ def show_page(page_name):
         create_example_page_b_content("page_content_container")
         current_page = "page_b"
         print("Loaded page B content")
+    elif page_name == "user_create":
+        current_page = "user_management"
+        create_user_management_content("page_content_container")
+        print("Loaded User_create")
     else:
         # Default fallback
         dpg.add_text("Page not found", parent="page_content_container", color=[255, 0, 0])
         print(f"Unknown page: {page_name}")
 
 def get_current_page():
+    
     """Returns the current page name"""
     return current_page
 

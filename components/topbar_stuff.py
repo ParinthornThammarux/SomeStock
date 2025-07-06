@@ -3,7 +3,6 @@ import time
 import dearpygui.dearpygui as dpg
 from containers.container_content import show_page
 from utils import constants
-
 import sys
 
 def create_top_menu():
@@ -11,14 +10,14 @@ def create_top_menu():
     dpg.set_item_pos("close_dialog", (constants.WinW // 2 - 150, constants.WinH // 2 - 75))
     with dpg.menu_bar():
         with dpg.menu(label="Profile", tag='user'):
-            dpg.add_menu_item(label="Create User", callback=lambda: (dpg.show_item("option_window"), dpg.focus_item("option_window")))
+            dpg.add_menu_item(label="Create User", callback=lambda: (show_page("user_create")))
             dpg.add_menu_item(label="Switch User", callback=lambda: (dpg.show_item("option_window"), dpg.focus_item("option_window")))
             dpg.add_menu_item(label="Save Data", callback=lambda: (dpg.show_item("option_window"), dpg.focus_item("option_window")))
 
         dpg.add_button(label="Options", callback=lambda: dpg.configure_item("about_window", show=True))
         dpg.add_button(label="About", callback=lambda: show_page("welcome"))
         dpg.add_button(label="Close", callback=lambda: (dpg.show_item("close_dialog"), dpg.focus_item("close_dialog")))
-
+              
 def create_close_dialog():
     with dpg.window(label="Exit Dialog", width=300, height=150, 
                     show=False, tag="close_dialog",
