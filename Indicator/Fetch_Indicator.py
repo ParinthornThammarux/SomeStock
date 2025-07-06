@@ -36,7 +36,7 @@ class StockPriceModel(nn.Module):
         return self.net(x)
 
 # ==================== Fetch Data ====================
-def fetch_data(symbol, period):
+def fetch_data(symbol, period = "1y"):
     data = yf.Ticker(symbol).history(period=period)
     data.reset_index(inplace=True)
     return data
