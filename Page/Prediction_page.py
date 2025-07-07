@@ -31,7 +31,8 @@ class PredictionWindow(QMainWindow):
         left_layout.addWidget(self.label_input)
 
         self.combo = QComboBox()
-        self.combo.addItems(["RSI", "PricePrediction","Binomial Prediction", "Hammer search", "Doji search", "EMA Cross", "PEG Ratio", "MACD","Trending","Aroon"])
+        self.combo.addItems(["RSI", "PricePrediction","Binomial Prediction", "Hammer search", "Doji search", "EMA Cross", "PEG Ratio", "MACD","Trending","Aroon",
+                             "Sushi","VMA","ROC","WILLR"])
         self.combo.setPlaceholderText("Select an option")
         left_layout.addWidget(self.combo)
 
@@ -106,6 +107,14 @@ class PredictionWindow(QMainWindow):
                 success = Prediction.predict_momentum(symbol)
             case "Aroon":
                 success = Prediction.predict_aroon(symbol)
+            case "Sushi":
+                success = Prediction.sushiroll(symbol)
+            case "VMA":
+                success = Prediction.VMA(symbol)
+            case "ROC":
+                success = Prediction.calculate_Roc(symbol)
+            case "WILLR":
+                success = Prediction.calculate_WILLR(symbol)
             case _:
                 success = "Invalid Option"
         self.result_text.setText(f"Prediction for {symbol} : {success:.2f}" if isinstance(success, float) else str(success))

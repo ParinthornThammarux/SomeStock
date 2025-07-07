@@ -396,5 +396,75 @@ def sushiroll(symbol):
     condi3 = open< close.shift(1)
     condi4 = close > open.shift(1)
 
-    mpf.plot(data, type='candle', addplot=ap, volume=True, title=f"{symbol} Sushi Roll Reverse Pattern")
+    # mpf.plot(data, type='candle', addplot=ap, volume=True, title=f"{symbol} Sushi Roll Reverse Pattern")
+    print(f"📈 {symbol} - Sushi Roll Reverse Pattern Detected: {condi1 & condi2 & condi3 & condi4.sum()} occurrences")
     return condi1 & condi2 & condi3 & condi4
+# ==========================================
+def VMA(symbol):
+    data = fetch_data(symbol)
+    data.set_index('Date', inplace=True)
+
+    dv = data['Close'] * (data['Volume'])
+    data['VMA'] = dv.rolling(window=20).sum() / data['Volume'].rolling(window=20).sum()
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(data.index, data['Close'], label='Close Price', color='blue')
+    plt.plot(data.index, data['VMA'], label='VMA', color='orange')
+    plt.title(f"{symbol} - Volume Moving Average")
+    plt.xlabel("Date")
+    plt.ylabel("Price")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    latest_vma = data['VMA'].iloc[-1]
+    print(f"📈 {symbol} - Latest VMA: {latest_vma:.2f}")
+
+    return latest_vma
+def calculate_Roc(symbol):
+    data = fetch_data(symbol)
+    data.set_index('Date', inplace=True)
+
+    data['ROC'] = talib.ROC(data['Close'], timeperiod=10)
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(data.index, data['ROC'], label='Rate of Change (ROC)', color='purple')
+    plt.axhline(0, color='black', linestyle='--', label='Zero Line')
+    plt.title(f"{symbol} - Rate of Change (ROC)")
+    plt.xlabel("Date")
+    plt.ylabel("ROC Value")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    latest_roc = data['ROC'].iloc[-1]
+    print(f"📈 {symbol} - Latest ROC: {latest_roc:.2f}")
+
+    return latest_roc
+def calculate_WILLR(symbol):
+    data = fetch_data(symbol)
+    data.set_index('Date', inplace=True)
+
+    data['WILLR'] = talib.WILLR(data['High'], data['Low'], data['Close'], timeperiod=14)
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(data.index, data['WILLR'], label='Williams %R', color='orange')
+    plt.axhline(-20, color='red', linestyle='--', label='Overbought (-20)')
+    plt.axhline(-80, color='green', linestyle='--', label='Oversold (-80)')
+    plt.title(f"{symbol} - Williams %R")
+    plt.xlabel("Date")
+    plt.ylabel("Williams %R Value")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    latest_willr = data['WILLR'].iloc[-1]
+    print(f"📈 {symbol} - Latest Williams %R: {latest_willr:.2f}")
+    if(latest_willr > -20):
+        print("📈 Overbought condition detected.")
+    elif(latest_willr < -80):
+        print("📉 Oversold condition detected.")
+    return latest_willr
