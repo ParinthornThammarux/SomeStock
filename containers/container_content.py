@@ -3,7 +3,8 @@
 # Wraps everything on the right side (excluding sidebar) 
 
 import dearpygui.dearpygui as dpg
-from components.user.create_user import create_user_management_content
+from components.user.create_user import create_user_creation_content
+from components.user.login_user import create_user_login_content
 from pages.welcome_page import create_welcome_content
 from pages.example_page_b import create_example_page_b_content
 from components.graph_dpg import create_main_graph
@@ -49,15 +50,19 @@ def show_page(page_name):
         create_main_graph("page_content_container")  # Original simple chart
         current_page = "main"
     elif page_name == "enhanced":  # New enhanced page
-        create_graph_tabs("page_content_container")
+        create_main_graph("page_content_container")
         current_page = "enhanced"
     elif page_name == "page_b":
-        create_example_page_b_content("page_content_container")
+        create_graph_tabs("page_content_container")
         current_page = "page_b"
         print("Loaded page B content")
     elif page_name == "user_create":
-        current_page = "user_management"
-        create_user_management_content("page_content_container")
+        current_page = "user_create"
+        create_user_creation_content("page_content_container")
+        print("Loaded User_create")
+    elif page_name == "user_login":
+        current_page = "user_login"
+        create_user_login_content("page_content_container")
         print("Loaded User_create")
     elif page_name == "indicator":
         # Import here to avoid circular import issues

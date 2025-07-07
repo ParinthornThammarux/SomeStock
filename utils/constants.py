@@ -173,6 +173,10 @@ ANIMATION_DURATION = 0.2  # seconds
 COLLAPSED_WIDTH = 50
 EXPANDED_WIDTH = 200
 
+# --- User variables
+Cur_User = ""
+
+
 # --- Global Font References (will be populated in main_app.py) ---
 default_font_id = None
 font_awesome_icon_font_id = None

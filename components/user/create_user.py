@@ -9,7 +9,7 @@ import random
 import time
 from utils import constants
 
-def create_user_management_content(parent_tag):
+def create_user_creation_content(parent_tag):
     """
     Creates the user management page content directly in the parent container.
     Follows the same pattern as other pages in the app.
@@ -18,10 +18,21 @@ def create_user_management_content(parent_tag):
     
     # Add some padding from the top
     dpg.add_spacer(height=20, parent=parent_tag)
-    
+
     # Page title
-    dpg.add_text("User Management", parent=parent_tag, color=[255, 255, 255],indent=10)
-    dpg.add_text("Create and manage user accounts", parent=parent_tag, color=[150, 150, 150],indent=10)
+    with dpg.group(horizontal=True, parent=parent_tag):
+        with dpg.group():
+            dpg.add_text("User Management", color=[255, 255, 255], indent=10)
+            dpg.add_text("Create and manage user accounts", color=[150, 150, 150], indent=10)
+        with dpg.group():
+            dpg.add_spacer(height=20)  # Adjust this value to move text down
+            if constants.Cur_User != "":
+                with dpg.group(horizontal=True):
+                    dpg.add_text("Currently logged in as ", indent=280)
+                    dpg.add_text(f"{constants.Cur_User}", color=[255, 200, 100])
+            else:
+                dpg.add_text("Currently not logged in", indent=280)
+
     dpg.add_separator(parent=parent_tag)
     dpg.add_spacer(height=20, parent=parent_tag)
     
@@ -330,89 +341,81 @@ def create_user():
         dpg.configure_item("creation_message", color=[255, 100, 100])
         print(f"Error creating user: {e}")
 
-def clear_form():
-    """Clear all form fields after successful registration"""
-    dpg.set_value("new_username", "")
-    dpg.set_value("new_password", "")
-    dpg.set_value("confirm_password", "")
-    dpg.set_value("new_pin", "")
-    
-    # Clear status messages
-    dpg.set_value("username_icon", "")
-    dpg.set_value("username_text", "")
-    dpg.set_value("password_icon", "")
-    dpg.set_value("password_text", "")
-    dpg.set_value("confirm_icon", "")
-    dpg.set_value("confirm_text", "")
-    dpg.set_value("pin_icon", "")
-    dpg.set_value("pin_text", "")
-    global success_msg
-    success_msg = ""
-    print("Form cleared")
 
+def clear_form():
+    from containers.container_content import show_page
+    show_page("user_create")
+    print("Form cleared")
 def save_user_registration(username, password_hash, pin_hash):
-    """Save user registration details to JSON file"""
+    """Save user registration details to individual JSON file"""
     try:
-        # Create user data
-        user_data = {
-            "username": username,
-            "password_hash": password_hash,  # Store hashed password
-            "pin_hash": pin_hash,  # Store hashed PIN
-            "created_date": dt.now().isoformat(),
-        }
-        
         # Create registered_users directory if it doesn't exist
         users_dir = "registered_users"
         if not os.path.exists(users_dir):
             os.makedirs(users_dir)
             print(f"✅ Created directory: {users_dir}")
         
-        # Load existing users or create new list
-        users_file = os.path.join(users_dir, "users.json")
-        if os.path.exists(users_file):
-            with open(users_file, 'r', encoding='utf-8') as f:
-                users_data = json.load(f)
-        else:
-            users_data = {
-                "users": [],
-                "metadata": {
-                    "total_users": 0,
-                    "created_date": dt.now().isoformat(),
-                }
-            }
+        # Check if username already exists by cycling through existing user files
+        existing_usernames = []
+        
+        # Get all .json files in the users directory
+        if os.path.exists(users_dir):
+            for filename in os.listdir(users_dir):
+                if filename.endswith('.json'):
+                    file_path = os.path.join(users_dir, filename)
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            user_data = json.load(f)
+                            if 'username' in user_data:
+                                existing_usernames.append(user_data['username'])
+                                print(f"📝 Found existing user: {user_data['username']}")
+                    except (json.JSONDecodeError, KeyError) as e:
+                        print(f"⚠️ Warning: Could not read user file {filename}: {e}")
+                        continue
+        
+        print(f"📋 Found {len(existing_usernames)} existing users: {existing_usernames}")
         
         # Check if username already exists
-        existing_usernames = [user["username"] for user in users_data["users"]]
         if username in existing_usernames:
-            # Show error message
+            print(f"❌ Username '{username}' already exists!")
             show_registration_result(False, username, "Username already exists!")
             return
         
-        # Add new user
-        users_data["users"].append(user_data)
-        users_data["metadata"]["total_users"] = len(users_data["users"])
+        # Create user data
+        user_data = {
+            "username": username,
+            "password_hash": password_hash,  # Store hashed password
+            "pin_hash": pin_hash,  # Store hashed PIN
+            "created_date": dt.now().isoformat(),
+            "favorite_stocks": [],
+            "displayed_stocks": []
+        }
         
-        # Save to file
-        with open(users_file, 'w', encoding='utf-8') as f:
-            json.dump(users_data, f, indent=2, ensure_ascii=False)
-        
-        print(f"✅ User '{username}' registered successfully!")
-        print(f"📁 Saved to: {os.path.abspath(users_file)}")
-        
-        # Also save individual user file for quick access
+        # Save individual user file
         individual_file = os.path.join(users_dir, f"{username}.json")
         with open(individual_file, 'w', encoding='utf-8') as f:
             json.dump(user_data, f, indent=2, ensure_ascii=False)
         
+        # Update current user in constants
+        constants.Cur_User = username
+        
+        # Update welcome message if the tag exists
+        if dpg.does_item_exist("user_welcome_message"):
+            dpg.set_value("user_welcome_message", username)
+        
+        print(f"✅ User '{username}' registered successfully!")
+        print(f"📁 Saved to: {os.path.abspath(individual_file)}")
+        print(f"👤 Current user set to: {constants.Cur_User}")
+        
         # Show success message and clear form
-        show_registration_result(True, f"Account created successfully for {username}!")
+        show_registration_result(True, username, f"Account created successfully for {username}!")
         clear_form()
         
     except Exception as e:
         print(f"❌ Error saving user registration: {e}")
         import traceback
         traceback.print_exc()
-        show_registration_result(False, f"Error creating account: {str(e)}")
+        show_registration_result(False, username, f"Error creating account: {str(e)}")
 
 def show_registration_result(success,username, message):
     """Show registration result message in a small centered window"""
@@ -427,7 +430,7 @@ def show_registration_result(success,username, message):
     
     # Window dimensions
     window_width = 400
-    window_height = 120
+    window_height = 140
     
     # Calculate center position
     pos_x = (viewport_width - window_width) // 2
