@@ -118,3 +118,4 @@ class PredictionWindow(QMainWindow):
             case _:
                 success = "Invalid Option"
         self.result_text.setText(f"Prediction for {symbol} : {success:.2f}" if isinstance(success, float) else str(success))
+        

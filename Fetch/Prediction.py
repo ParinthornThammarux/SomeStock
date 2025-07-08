@@ -15,6 +15,8 @@ from bs4 import BeautifulSoup
 # ==================== Dataset ====================
 class StockDataset(Dataset):
     def __init__(self, prices, window_size=10):
+        prices = prices['Close'].values
+        assert prices.ndim == 1, "Prices should be a 1D array of closing prices."
         self.X, self.y = [], []
         for i in range(len(prices) - window_size):
             self.X.append(prices[i:i + window_size])
@@ -92,14 +94,15 @@ def predict_next_price(symbol, window_size=10):
     if model is None:
         model = train_model(symbol, window_size)
 
-    recent_prices = prices[-window_size:]
-    input_tensor = torch.tensor(recent_prices, dtype=torch.float32).unsqueeze(0)
+    recent_closes = prices['Close'].values[-window_size:]
+    input_tensor = torch.tensor(recent_closes, dtype=torch.float32).unsqueeze(0)
+
     with torch.no_grad():
         predicted = model(input_tensor).item()
 
     print(f"📈 {symbol} - Predicted next close price: ${predicted:.2f}")
 
-    plt.plot(np.arange(len(prices)), prices, label='Actual Price')
+    plt.plot(np.arange(len(prices)), prices['Close'], label='Actual Price')
     plt.scatter(len(prices), predicted, color='red', label='Predicted Price')
     plt.title(f"{symbol} - PyTorch Forecast")
     plt.xlabel("Days")
@@ -110,6 +113,7 @@ def predict_next_price(symbol, window_size=10):
     plt.show()
 
     return predicted
+
 
 # ==================== RSI Prediction ====================
 def predict_rsi(symbol):
