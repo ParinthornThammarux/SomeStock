@@ -19,6 +19,7 @@ def loadfave():
             return []  # ถ้าไฟล์ว่างหรือไม่ใช่ JSON ถูก ให้คืนค่าเป็นลิสต์ว่าง
 
 def savefave(favorites):
+    favorites.sort()
     with open(FAVORITE_FILE, 'w') as f:
         json.dump(favorites, f)
 
