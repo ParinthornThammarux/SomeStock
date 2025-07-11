@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 
 favorite_stocks.json
-
+TFEX_Favorites.json
 # C extensions
 *.so
 

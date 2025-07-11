@@ -38,7 +38,7 @@ class PredictionWindow(QMainWindow):
         left_layout.addWidget(self.result_text)
 
         self.label_input = QLineEdit()
-        self.label_input.setPlaceholderText("Enter stock symbol (e.g., AAPL)")
+        self.label_input.setPlaceholderText("Enter 1-2 stock symbols (e.g., AAPL,MSFT)")
         left_layout.addWidget(self.label_input)
 
         self.combo = QComboBox()
@@ -97,7 +97,11 @@ class PredictionWindow(QMainWindow):
             self.fav_list.addItem(item)
 
     def favorite_clicked(self, item):
-        self.label_input.setText(item.text())
+        current = self.label_input.text().strip()
+        if current:
+            self.label_input.setText(f"{current},{item.text()}")
+        else:
+            self.label_input.setText(item.text())
 
     def open_Main_window(self):
         from main import MainWindow
@@ -107,46 +111,51 @@ class PredictionWindow(QMainWindow):
         self.hide()
 
     def predict_stock(self):
-        symbol = self.label_input.text().strip().upper()
+        symbols = [s.strip().upper() for s in self.label_input.text().split(",") if s.strip()]
+        if not symbols:
+            self.result_text.setText("⚠ กรุณากรอกชื่อหุ้นอย่างน้อย 1 ตัว")
+            return
+
         option = self.combo.currentText()
         self.result_text.clear()
 
-        if not symbol:
-            self.result_text.setText("⚠ กรุณากรอกชื่อหุ้น")
-            return
+        for symbol in symbols:
+            try:
+                match option:
+                    case "PricePrediction":
+                        result = Prediction.predict_next_price(symbol)
+                    case "RSI":
+                        result = Prediction.predict_rsi(symbol)
+                    case "Hammer search":
+                        result = Prediction.detect_hammer(symbol)
+                    case "Doji search":
+                        result = Prediction.detect_doji(symbol)
+                    case "EMA Cross":
+                        result = Prediction.detect_ema_cross(symbol)
+                    case "PEG Ratio":
+                        result = Prediction.predict_peg_ratio(symbol)
+                    case "MACD":
+                        result = Prediction.predict_MACD(symbol)
+                    case "Binomial Prediction":
+                        result = Prediction.predict_price_binomial(symbol)
+                    case "Trending":
+                        result = Prediction.predict_momentum(symbol)
+                    case "Aroon":
+                        result = Prediction.predict_aroon(symbol)
+                    case "Sushi":
+                        result = Prediction.sushiroll(symbol)
+                    case "VMA":
+                        result = Prediction.VMA(symbol)
+                    case "ROC":
+                        result = Prediction.calculate_Roc(symbol)
+                    case "WILLR":
+                        result = Prediction.calculate_WILLR(symbol)
+                    case _:
+                        result = "❌ ไม่พบตัวเลือกที่คุณเลือก"
 
-        match option:
-            case "PricePrediction":
-                result = Prediction.predict_next_price(symbol)
-            case "RSI":
-                result = Prediction.predict_rsi(symbol)
-            case "Hammer search":
-                result = Prediction.detect_hammer(symbol)
-            case "Doji search":
-                result = Prediction.detect_doji(symbol)
-            case "EMA Cross":
-                result = Prediction.detect_ema_cross(symbol)
-            case "PEG Ratio":
-                result = Prediction.predict_peg_ratio(symbol)
-            case "MACD":
-                result = Prediction.predict_MACD(symbol)
-            case "Binomial Prediction":
-                result = Prediction.predict_price_binomial(symbol)
-            case "Trending":
-                result = Prediction.predict_momentum(symbol)
-            case "Aroon":
-                result = Prediction.predict_aroon(symbol)
-            case "Sushi":
-                result = Prediction.sushiroll(symbol)
-            case "VMA":
-                result = Prediction.VMA(symbol)
-            case "ROC":
-                result = Prediction.calculate_Roc(symbol)
-            case "WILLR":
-                result = Prediction.calculate_WILLR(symbol)
-            case _:
-                result = "❌ ไม่พบตัวเลือกที่คุณเลือก"
+                display_text = f"📈 Prediction for {symbol}:\n\n{result:.2f}" if isinstance(result, float) else str(result)
+                self.result_text.append(display_text)
+                self.result_text.append(f"\n🛠 Method used: {option}\n{'-'*50}\n")
 
-        display_text = f"📈 Prediction for {symbol}:\n\n{result:.2f}" if isinstance(result, float) else str(result)
-        self.result_text.setText(display_text)
-        self.result_text.append(f"\n🛠 Method used: {option}")
+            except Exception as e:
+                self.result_text.append(f"❌ Error with {symbol}: {str(e)}\n{'-'*50}\n")
