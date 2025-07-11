@@ -11,6 +11,7 @@ from Page.Manage_Page import ManagePage
 from Page.Other_asset import OtherAssetWindow
 from Page.Dashboard import DashboardWindow
 from Page.Tax_Calculator import TaxCalculatorWindow
+from Page.TFEX_Page import TFEXWINDOW
 import os
 
 class MainWindow(QMainWindow):
@@ -39,11 +40,12 @@ class MainWindow(QMainWindow):
         self.open_second_btn = QPushButton("Search Stock")
         self.open_third_btn = QPushButton("Manage")
         self.open_forth_btn = QPushButton("Prediction Mode")
-        self.open_zero_btn = QPushButton("Comparison")
+        self.open_zero_btn = QPushButton("TFEX")
 
         self.open_second_btn.clicked.connect(self.open_Dashboard_page)
         self.open_third_btn.clicked.connect(self.open_Manage_window)
         self.open_forth_btn.clicked.connect(self.open_prediction_window)
+        self.open_zero_btn.clicked.connect(self.OPEN_TFEX_Page)
 
         grid_layout.addWidget(self.open_second_btn, 0, 0)
         grid_layout.addWidget(self.open_third_btn, 0, 1)
@@ -63,7 +65,7 @@ class MainWindow(QMainWindow):
         self.Dashboard_page = None
         self.prediction_window = None
         self.Manage_window = None
-        self.Index_window = None
+        self.TFEX_Page = None
         self.dashboard_window = None
         self.Tax_window = None
 
@@ -97,10 +99,10 @@ class MainWindow(QMainWindow):
             self.Manage_window = ManagePage()
         self.Manage_window.show()
         self.hide()
-    def index_page(self):
-        if self.Index_window is None:
-            self.Index_window = OtherAssetWindow()
-        self.Index_window.show()
+    def OPEN_TFEX_Page(self):
+        if self.TFEX_Page is None:
+            self.TFEX_Page = TFEXWINDOW()
+        self.TFEX_Page.show()
         self.hide()
     def dashboard_page(self):
         if self.Dashboard_page is None:

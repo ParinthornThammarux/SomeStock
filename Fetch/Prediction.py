@@ -99,7 +99,7 @@ def predict_next_price(symbol, window_size=10):
 
     with torch.no_grad():
         predicted = model(input_tensor).item()
-
+    print(f"📈 {symbol} - Current Price {symbol}: ${prices['Close'].iloc[-1]:.2f}")
     print(f"📈 {symbol} - Predicted next close price: ${predicted:.2f}")
 
     plt.plot(np.arange(len(prices)), prices['Close'], label='Actual Price')
