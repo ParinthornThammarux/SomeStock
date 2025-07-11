@@ -1,10 +1,14 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QLineEdit, QTextEdit, QPushButton, QComboBox, QListWidget, QListWidgetItem,QSlider
+    QLineEdit, QTextEdit, QPushButton, QComboBox, QListWidget,
+    QListWidgetItem, QFileDialog
 )
 from PySide6.QtCore import Qt
 from Fetch import Prediction
 from Fetch.Manage_FAV import loadfave
+
+import os
+
 
 class PredictionWindow(QMainWindow):
     def __init__(self):
@@ -12,15 +16,22 @@ class PredictionWindow(QMainWindow):
         self.setWindowTitle("📈 Stock Prediction")
         self.setGeometry(200, 100, 900, 700)
 
-        # --- Central Layout ---
+        self.favorite_file = None
+
+        # --- Central Widget ---
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        main_layout = QHBoxLayout(central_widget)  # Horizontal: แบ่งซ้าย-ขวา
+        main_layout = QHBoxLayout(central_widget)
 
-        # --- Left Layout (Main UI) ---
+        # --- Left Layout ---
         left_layout = QVBoxLayout()
         left_layout.setSpacing(15)
         left_layout.setContentsMargins(30, 30, 30, 30)
+
+        title = QLabel("🔮 Stock Prediction Tool")
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        left_layout.addWidget(title)
 
         self.result_text = QTextEdit()
         self.result_text.setReadOnly(True)
@@ -31,8 +42,10 @@ class PredictionWindow(QMainWindow):
         left_layout.addWidget(self.label_input)
 
         self.combo = QComboBox()
-        self.combo.addItems(["RSI", "PricePrediction","Binomial Prediction", "Hammer search", "Doji search", "EMA Cross", "PEG Ratio", "MACD","Trending","Aroon",
-                             "Sushi","VMA","ROC","WILLR"])
+        self.combo.addItems([
+            "RSI", "PricePrediction", "Binomial Prediction", "Hammer search", "Doji search",
+            "EMA Cross", "PEG Ratio", "MACD", "Trending", "Aroon", "Sushi", "VMA", "ROC", "WILLR"
+        ])
         self.combo.setPlaceholderText("Select an option")
         left_layout.addWidget(self.combo)
 
@@ -40,13 +53,13 @@ class PredictionWindow(QMainWindow):
         self.predict_button.clicked.connect(self.predict_stock)
         left_layout.addWidget(self.predict_button)
 
-        back_to_main_btn = QPushButton("กลับไปหน้าหลัก")
+        back_to_main_btn = QPushButton("⬅ กลับไปหน้าหลัก")
         back_to_main_btn.clicked.connect(self.open_Main_window)
         left_layout.addWidget(back_to_main_btn)
 
         main_layout.addLayout(left_layout)
 
-        # --- Right Layout (Favorites Bar) ---
+        # --- Right Layout ---
         right_layout = QVBoxLayout()
         right_layout.setContentsMargins(10, 30, 30, 30)
 
@@ -54,8 +67,11 @@ class PredictionWindow(QMainWindow):
         self.fav_label.setAlignment(Qt.AlignCenter)
         right_layout.addWidget(self.fav_label)
 
+        self.choose_file_btn = QPushButton("📁 เลือกไฟล์รายการโปรด")
+        self.choose_file_btn.clicked.connect(self.select_favorite_file)
+        right_layout.addWidget(self.choose_file_btn)
+
         self.fav_list = QListWidget()
-        self.load_favorites_to_list()
         self.fav_list.itemClicked.connect(self.favorite_clicked)
         right_layout.addWidget(self.fav_list)
 
@@ -63,8 +79,18 @@ class PredictionWindow(QMainWindow):
 
         self.Main_window = None
 
+    def select_favorite_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "เลือกไฟล์รายการโปรด", "", "JSON Files (*.json);;All Files (*)"
+        )
+        if file_path:
+            self.favorite_file = file_path
+            self.load_favorites_to_list()
+
     def load_favorites_to_list(self):
-        favorites = loadfave()
+        if not self.favorite_file:
+            return
+        favorites = loadfave(self.favorite_file)
         self.fav_list.clear()
         for symbol in favorites:
             item = QListWidgetItem(symbol)
@@ -81,41 +107,46 @@ class PredictionWindow(QMainWindow):
         self.hide()
 
     def predict_stock(self):
-        symbol = self.label_input.text().strip()
+        symbol = self.label_input.text().strip().upper()
         option = self.combo.currentText()
-
         self.result_text.clear()
+
+        if not symbol:
+            self.result_text.setText("⚠ กรุณากรอกชื่อหุ้น")
+            return
 
         match option:
             case "PricePrediction":
-                success = Prediction.predict_next_price(symbol)
+                result = Prediction.predict_next_price(symbol)
             case "RSI":
-                success = Prediction.predict_rsi(symbol)
+                result = Prediction.predict_rsi(symbol)
             case "Hammer search":
-                success = Prediction.detect_hammer(symbol)
+                result = Prediction.detect_hammer(symbol)
             case "Doji search":
-                success = Prediction.detect_doji(symbol)
+                result = Prediction.detect_doji(symbol)
             case "EMA Cross":
-                success = Prediction.detect_ema_cross(symbol)
+                result = Prediction.detect_ema_cross(symbol)
             case "PEG Ratio":
-                success = Prediction.predict_peg_ratio(symbol)
+                result = Prediction.predict_peg_ratio(symbol)
             case "MACD":
-                success = Prediction.predict_MACD(symbol)
+                result = Prediction.predict_MACD(symbol)
             case "Binomial Prediction":
-                success = Prediction.predict_price_binomial(symbol)
+                result = Prediction.predict_price_binomial(symbol)
             case "Trending":
-                success = Prediction.predict_momentum(symbol)
+                result = Prediction.predict_momentum(symbol)
             case "Aroon":
-                success = Prediction.predict_aroon(symbol)
+                result = Prediction.predict_aroon(symbol)
             case "Sushi":
-                success = Prediction.sushiroll(symbol)
+                result = Prediction.sushiroll(symbol)
             case "VMA":
-                success = Prediction.VMA(symbol)
+                result = Prediction.VMA(symbol)
             case "ROC":
-                success = Prediction.calculate_Roc(symbol)
+                result = Prediction.calculate_Roc(symbol)
             case "WILLR":
-                success = Prediction.calculate_WILLR(symbol)
+                result = Prediction.calculate_WILLR(symbol)
             case _:
-                success = "Invalid Option"
-        self.result_text.setText(f"Prediction for {symbol} : {success:.2f}" if isinstance(success, float) else str(success))
-        self.result_text.append(f"Option selected: {option}")
+                result = "❌ ไม่พบตัวเลือกที่คุณเลือก"
+
+        display_text = f"📈 Prediction for {symbol}:\n\n{result:.2f}" if isinstance(result, float) else str(result)
+        self.result_text.setText(display_text)
+        self.result_text.append(f"\n🛠 Method used: {option}")

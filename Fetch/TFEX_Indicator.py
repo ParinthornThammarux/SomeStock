@@ -40,4 +40,25 @@ def MA(symbol, period="1y"):
     plt.grid()
     plt.show()
 
-        return data
+    return data
+def predict_rsi(symbol, period="1y"):
+    data = fetch_data(symbol, period)
+    delta = data['Close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+
+    data['RSI'] = rsi
+
+    plt.figure(figsize=(14, 7))
+    plt.plot(data['RSI'], label='RSI', color='blue')
+    plt.axhline(70, linestyle='--', alpha=0.5, color='red')
+    plt.axhline(30, linestyle='--', alpha=0.5, color='green')
+    plt.title('Relative Strength Index (RSI)')
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+    return data
