@@ -102,6 +102,7 @@ def predict_next_price(symbol, window_size=10):
     print(f"📈 {symbol} - Current Price {symbol}: ${prices['Close'].iloc[-1]:.2f}")
     print(f"📈 {symbol} - Predicted next close price: ${predicted:.2f}")
 
+    plt.figure(figsize=(10, 5))
     plt.plot(np.arange(len(prices)), prices['Close'], label='Actual Price')
     plt.scatter(len(prices), predicted, color='red', label='Predicted Price')
     plt.title(f"{symbol} - PyTorch Forecast")
