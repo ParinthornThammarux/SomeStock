@@ -241,30 +241,65 @@ def detect_ema_cross(symbol):
     return cross_days
 
 # ==================== PEG Ratio Prediction ====================
+
 def predict_peg_ratio(symbol):
-    url = f"https://finviz.com/quote.ashx?t={symbol}"
     headers = {"User-Agent": "Mozilla/5.0"}
-    r = requests.get(url, headers=headers)
-    soup = BeautifulSoup(r.text, "html.parser")
 
-    table = soup.find("table", class_="snapshot-table2")
-    if not table:
-        print("❌ Table not found.")
-        return None
+    # ตรวจสอบว่าเป็นหุ้นไทยหรือไม่ (.BK)
+    is_thai = symbol.upper().endswith(".BK")
+    symbol_clean = symbol.replace(".BK", "").upper()
 
-    for row in table.find_all("tr"):
-        cells = row.find_all("td")
-        for i in range(0, len(cells), 2):
-            if cells[i].text == "PEG":
-                peg = cells[i+1].text
-                try:
-                    peg_value = float(peg)
-                    print(f"📊 {symbol} - PEG Ratio: {peg_value}")
-                    return peg_value
-                except ValueError:
-                    print(f"⚠️ PEG Ratio not available or invalid: {peg}")
-                    return None
-    return None
+    if is_thai:
+        # ======= ดึงข้อมูลจาก SET =======
+        url = f"https://www.set.or.th/th/market/product/stock/quote/{symbol_clean}/valuation"
+        try:
+            r = requests.get(url, headers=headers)
+            r.encoding = 'utf-8'  # เผื่อหน้าเว็บเป็นภาษาไทย
+            soup = BeautifulSoup(r.text, "html.parser")
+
+            peg_label = soup.find(string="P/E Growth (PEG)")
+            if not peg_label:
+                print("❌ ไม่พบข้อมูล PEG บนเว็บไซต์ SET")
+                return None
+
+            peg_value_tag = peg_label.find_next("div")
+            peg_text = peg_value_tag.text.strip().replace(",", "")
+            peg_value = float(peg_text)
+            print(f"🇹🇭 {symbol_clean} - PEG Ratio (SET): {peg_value}")
+            return peg_value
+        except Exception as e:
+            print(f"⚠️ เกิดข้อผิดพลาดในการดึงข้อมูลจาก SET: {e}")
+            return None
+    else:
+        # ======= ดึงข้อมูลจาก Finviz =======
+        url = f"https://finviz.com/quote.ashx?t={symbol_clean}"
+        try:
+            r = requests.get(url, headers=headers)
+            soup = BeautifulSoup(r.text, "html.parser")
+
+            table = soup.find("table", class_="snapshot-table2")
+            if not table:
+                print("❌ ไม่พบตารางข้อมูลบน Finviz")
+                return None
+
+            for row in table.find_all("tr"):
+                cells = row.find_all("td")
+                for i in range(0, len(cells), 2):
+                    if cells[i].text.strip() == "PEG":
+                        peg = cells[i+1].text.strip()
+                        try:
+                            peg_value = float(peg)
+                            print(f"🌐 {symbol_clean} - PEG Ratio (Finviz): {peg_value}")
+                            return peg_value
+                        except ValueError:
+                            print(f"⚠️ ค่า PEG ไม่สามารถแปลงเป็นตัวเลขได้: {peg}")
+                            return None
+            print("⚠️ ไม่พบค่า PEG บน Finviz")
+            return None
+        except Exception as e:
+            print(f"⚠️ เกิดข้อผิดพลาดในการดึงข้อมูลจาก Finviz: {e}")
+            return None
+
 
 # ==================== MACD Prediction ====================
 def predict_MACD(symbol):
