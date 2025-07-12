@@ -1,6 +1,7 @@
 import os
 import joblib
 from sklearn.linear_model import LinearRegression
+from datetime import datetime
 import yfinance as yf
 import numpy as np
 import talib
@@ -11,6 +12,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from bs4 import BeautifulSoup
+import pandas as pd
 
 # ==================== Dataset ====================
 class StockDataset(Dataset):
@@ -71,10 +73,17 @@ def train_model(symbol, window_size=10, epochs=100):
             loss.backward()
             optimizer.step()
 
+    # วันที่เทรน
+    train_date = datetime.now().strftime("%Y-%m-%d")
+
+    # สร้างโฟลเดอร์และบันทึกโมเดล
     os.makedirs("Model", exist_ok=True)
-    model_path = f"Model/{symbol}_model.pt"
+    model_path = f"Model/{symbol}_model_{train_date}.pt"
     torch.save(model.state_dict(), model_path)
-    print(f"✅ Model saved to {model_path}")
+
+    print(f"✅ Model for {symbol} trained on {train_date}")
+    print(f"📁 Model saved to: {model_path}")
+    
     return model
 
 # ==================== Load Model ====================
@@ -140,10 +149,6 @@ def predict_rsi(symbol):
     return latest_rsi
 
 # ==================== Hammer Candlestick Detection ====================
-import pandas as pd
-import talib
-import mplfinance as mpf
-import numpy as np
 
 def detect_hammer(symbol):
     # ดึงข้อมูล OHLCV (คุณต้องกำหนด fetch_data เองให้ดึงข้อมูลย้อนหลังอย่างน้อย 1 ปี)
@@ -577,6 +582,7 @@ def calculate_Roc(symbol):
     print(f"📈 {symbol} - Latest ROC: {latest_roc:.2f}")
 
     return latest_roc
+
 def calculate_WILLR(symbol):
     data = fetch_data(symbol)
     data.set_index('Date', inplace=True)
