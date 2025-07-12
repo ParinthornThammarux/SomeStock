@@ -49,6 +49,7 @@ class StockPriceModel(nn.Module):
 def fetch_data(symbol, period="1y"):
     data = yf.Ticker(symbol).history(period=period)
     data.reset_index(inplace=True)
+    print(f"📅 ข้อมูลล่าสุดของ {symbol} ถึงวันที่: {data['Date'].max().date()}")
     return data
 
 # ==================== Train Model ====================
@@ -139,21 +140,64 @@ def predict_rsi(symbol):
     return latest_rsi
 
 # ==================== Hammer Candlestick Detection ====================
+import pandas as pd
+import talib
+import mplfinance as mpf
+import numpy as np
+
 def detect_hammer(symbol):
+    # ดึงข้อมูล OHLCV (คุณต้องกำหนด fetch_data เองให้ดึงข้อมูลย้อนหลังอย่างน้อย 1 ปี)
     data = fetch_data(symbol)
     data.set_index('Date', inplace=True)
+
+    # ตรวจจับแท่ง Hammer
     data['Hammer'] = talib.CDLHAMMER(data['Open'], data['High'], data['Low'], data['Close'])
 
+    # คำนวณเส้นค่าเฉลี่ยเคลื่อนที่
+    data['MA20'] = talib.SMA(data['Close'], timeperiod=20)
+    data['MA50'] = talib.SMA(data['Close'], timeperiod=50)
+
+    # หาวันที่เกิด Hammer
     hammer_days = data[data['Hammer'] != 0]
 
+    # เตรียมคอลัมน์ HammerLow สำหรับการ plot
+    data['HammerLow'] = np.nan
+    data.loc[hammer_days.index, 'HammerLow'] = data.loc[hammer_days.index, 'Low']
+
+    # รายงานวันที่พบ Hammer
     if not hammer_days.empty:
         print(f"📈 {symbol} - Hammer detected on the following dates:")
         for date in hammer_days.index:
             print(f"  - {date.date()}: {hammer_days.loc[date, 'Hammer']}")
     else:
-        print(f"📈 {symbol} - No Hammer detected in the last year.")
+        print(f"📉 {symbol} - No Hammer detected in the last year.")
+        return None
 
-    add_plot = mpf.make_addplot(hammer_days['Low'], type='scatter', markersize=100, marker='v', color='red')
+    # วิเคราะห์แนวโน้มเบื้องต้นหลัง Hammer ล่าสุด
+    last_hammer_date = hammer_days.index[-1]
+    recent_data = data.loc[last_hammer_date:].head(5)
+    future_close = recent_data['Close']
+
+    if len(future_close) >= 3 and future_close.iloc[-1] > future_close.iloc[0]:
+        print(f"✅ แนวโน้มบวกหลัง Hammer ({last_hammer_date.date()}): ราคามีแนวโน้มสูงขึ้นใน 3 วันถัดมา")
+    else:
+        print(f"⚠️ ไม่มีสัญญาณกลับตัวชัดเจนหลัง Hammer ({last_hammer_date.date()})")
+
+    # คำนวณแนวรับ/แนวต้าน
+    support = hammer_days['Low'].min()
+    resistance = data['Close'].max()
+
+    print(f"🔹 แนวรับ (Support): {support:.2f}")
+    print(f"🔸 แนวต้าน (Resistance): {resistance:.2f}")
+
+    # เตรียม plot เสริม
+    add_plot = [
+        mpf.make_addplot(data['MA20'], color='blue'),
+        mpf.make_addplot(data['MA50'], color='orange'),
+        mpf.make_addplot(data['HammerLow'], type='scatter', markersize=100, marker='v', color='red')
+    ]
+
+    # วาดกราฟแท่งเทียน
     mpf.plot(
         data,
         type='candle',
@@ -164,7 +208,13 @@ def detect_hammer(symbol):
         addplot=add_plot,
         figscale=1.2,
         figratio=(16, 9),
-        tight_layout=True
+        tight_layout=True,
+        hlines=dict(
+            hlines=[support, resistance],
+            linestyle='--',
+            linewidths=1.2,
+            colors=['green', 'purple']
+        )
     )
 
     return hammer_days
