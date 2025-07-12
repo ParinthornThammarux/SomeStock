@@ -221,20 +221,58 @@ def detect_hammer(symbol):
 
 # ==================== Doji Candlestick Detection ====================
 def detect_doji(symbol):
+    # ดึงข้อมูล
     data = fetch_data(symbol)
     data.set_index('Date', inplace=True)
+
+    # ตรวจจับแท่ง Doji
     data['Doji'] = talib.CDLDOJI(data['Open'], data['High'], data['Low'], data['Close'])
 
+    # คำนวณค่าเฉลี่ยเคลื่อนที่
+    data['MA20'] = talib.SMA(data['Close'], timeperiod=20)
+    data['MA50'] = talib.SMA(data['Close'], timeperiod=50)
+
+    # ดึงเฉพาะวันที่มี Doji
     doji_days = data[data['Doji'] != 0]
 
+    # เตรียมคอลัมน์แสดงจุด Doji บนกราฟ
+    data['DojiLow'] = np.nan
+    data.loc[doji_days.index, 'DojiLow'] = data.loc[doji_days.index, 'Low']
+
+    # รายงานวันที่พบ Doji
     if not doji_days.empty:
         print(f"📈 {symbol} - Doji detected on the following dates:")
         for date in doji_days.index:
             print(f"  - {date.date()}: {doji_days.loc[date, 'Doji']}")
     else:
-        print(f"📈 {symbol} - No Doji detected in the last year.")
+        print(f"📉 {symbol} - No Doji detected in the last year.")
+        return None
 
-    add_plot = mpf.make_addplot(doji_days['Low'], type='scatter', markersize=100, marker='v', color='blue')
+    # วิเคราะห์แนวโน้มหลัง Doji ล่าสุด
+    last_doji_date = doji_days.index[-1]
+    recent_data = data.loc[last_doji_date:].head(5)
+    future_close = recent_data['Close']
+
+    if len(future_close) >= 3 and future_close.iloc[-1] > future_close.iloc[0]:
+        print(f"✅ แนวโน้มบวกหลัง Doji ({last_doji_date.date()}): ราคามีแนวโน้มสูงขึ้นใน 3 วันถัดมา")
+    else:
+        print(f"⚠️ ไม่มีสัญญาณกลับตัวชัดเจนหลัง Doji ({last_doji_date.date()})")
+
+    # แนวรับ/แนวต้านจาก Doji
+    support = doji_days['Low'].min()
+    resistance = data['Close'].max()
+
+    print(f"🔹 แนวรับ (Support): {support:.2f}")
+    print(f"🔸 แนวต้าน (Resistance): {resistance:.2f}")
+
+    # เตรียมกราฟเสริม
+    add_plot = [
+        mpf.make_addplot(data['MA20'], color='blue'),
+        mpf.make_addplot(data['MA50'], color='orange'),
+        mpf.make_addplot(data['DojiLow'], type='scatter', markersize=100, marker='v', color='blue')
+    ]
+
+    # วาดกราฟ
     mpf.plot(
         data,
         type='candle',
@@ -245,7 +283,13 @@ def detect_doji(symbol):
         addplot=add_plot,
         figscale=1.2,
         figratio=(16, 9),
-        tight_layout=True
+        tight_layout=True,
+        hlines=dict(
+            hlines=[support, resistance],
+            linestyle='--',
+            linewidths=1.2,
+            colors=['green', 'purple']
+        )
     )
 
     return doji_days

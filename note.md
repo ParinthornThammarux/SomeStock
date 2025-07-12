@@ -28,6 +28,7 @@ requir lib
 16. Risk Evaluation
 17. Finance and Fundamental Analyzer
 18. Group Indicator
+19. โยนไฟล์ json ให้อ่านแล้วทำการscanหุ้นทุกตัวในนั้นออกมาตาม indicator ที่เลือก
 
 **Current Issue**
 1. slow peg ratio
