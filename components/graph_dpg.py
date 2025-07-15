@@ -5,9 +5,12 @@ import math
 import random
 import time
 import pandas as pd
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from utils import constants
-from utils.stockdex_layer import fetch_data_from_stockdx
+from utils.stockdex_layer import fetch_stock_data
 from components.stock_search import create_stock_search
 
 # Global variables to track current chart components
@@ -145,7 +148,7 @@ def create_main_graph(parent_tag, timestamp=None):
         dpg.add_spacer(height=15)
         
         with dpg.group(horizontal=True):
-            dpg.add_button(label="Random Data", callback=refresh_data, width=120)
+            dpg.add_button(label="Refresh Data", callback=refresh_data, width=120)
             dpg.add_spacer(width=10)
             dpg.add_button(label="Refresh All Cache", callback=refresh_all_cache, width=150)
             dpg.add_spacer(width=10)

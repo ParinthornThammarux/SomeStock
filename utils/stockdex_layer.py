@@ -6,93 +6,290 @@ import random
 import requests
 import pandas as pd
 from utils import constants
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 
 # =============================================================================
 # GLOBAL CONFIGURATION
 # =============================================================================
 
 # Rate limiting configuration
-RATE_LIMIT_DELAY = 3.0  # Minimum seconds between requests
-RANDOM_DELAY_MIN = 0.5  # Random delay range (min)
-RANDOM_DELAY_MAX = 1.5  # Random delay range (max)
-MAX_RETRIES = 3         # Maximum retry attempts
-REQUEST_TIMEOUT = 30    # Request timeout in seconds
+RATE_LIMIT_DELAY = 8.0  # Increased from 3.0 to 8.0 seconds
+RANDOM_DELAY_MIN = 2.0  # Increased from 0.5 to 2.0
+RANDOM_DELAY_MAX = 4.0  # Increased from 1.5 to 4.0
+MAX_RETRIES = 5         # Increased from 3 to 5
+REQUEST_TIMEOUT = 45    # Increased from 30 to 45 seconds
 
 # Global state
 last_request_time = 0
 request_count = 0
+active_fetches = {}  # {symbol: {'stop_flag': threading.Event(), 'result': None}}
+
 
 # =============================================================================
 # MAIN ENTRY POINT
 # =============================================================================
 
-def fetch_data_from_stockdx(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag):
+def fetch_stock_data(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag):
     """
-    Main function to fetch stock data with multiple fallback methods.
-    Updates both chart and cache with comprehensive data.
+    Try all sources simultaneously, stop all others when first one succeeds
     """
     print("=" * 80)
-    print(f"🔍 FETCHING DATA FOR: {symbol}")
+    print(f"🚀 OPTIMIZED FETCHING FOR: {symbol}")
     print("=" * 80)
     
-    # Apply rate limiting
-    _apply_rate_limiting()
+    # Create stop flag for this symbol
+    stop_flag = threading.Event()
+    fetch_info = {
+        'stop_flag': stop_flag,
+        'result': None,
+        'successful_source': None
+    }
+    active_fetches[symbol] = fetch_info
     
-    # Try multiple data sources in order of preference
-    data_sources = [
-        ("Yahoo Finance v8 API", _fetch_yahoo_v8_api),
-        ("yfinance Library", _fetch_yfinance),
-        ("Enhanced Stockdx", _fetch_enhanced_stockdx),
+    # Define fetch sources
+    sources = [
+        ("Yahoo Finance v8", _fetch_yahoo_v8_with_stop),
+        ("yfinance Library", _fetch_yfinance_with_stop),
+        ("Enhanced Stockdx", _fetch_enhanced_stockdx_with_stop),
     ]
     
-    for source_name, fetch_function in data_sources:
-        try:
-            print(f"🔄 Trying {source_name}...")
-            data = fetch_function(symbol)
-            
-            if _validate_data(data):
-                print(f"✅ Success with {source_name}")
-                _process_successful_fetch(symbol, data, line_tag, x_axis_tag, y_axis_tag, plot_tag)
-                return
-            else:
-                print(f"❌ {source_name} returned invalid data")
-                
-        except Exception as e:
-            print(f"❌ {source_name} failed: {e}")
-            continue
+    # Try Yahoo first (preferred source)
+    yahoo_result = _quick_yahoo_check(symbol, stop_flag)
+    if yahoo_result and yahoo_result != "RATE_LIMITED":
+        print("✅ Yahoo succeeded immediately")
+        _process_result(symbol, yahoo_result, "Yahoo Finance v8", line_tag, x_axis_tag, y_axis_tag, plot_tag)
+        return
     
-    print(f"❌ All data sources failed for {symbol}")
+    print("🔄 Yahoo rate limited or failed, trying all sources in parallel...")
+    
+    # Run all sources in parallel threads
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        # Submit all fetch tasks
+        future_to_source = {}
+        for source_name, fetch_function in sources:
+            future = executor.submit(fetch_function, symbol, stop_flag)
+            future_to_source[future] = source_name
+        
+        # Process results as they come in
+        for future in as_completed(future_to_source):
+            source_name = future_to_source[future]
+            
+            # Check if we should stop (another source already succeeded)
+            if stop_flag.is_set():
+                print(f"🛑 Stopping {source_name} - another source succeeded")
+                break
+                
+            try:
+                result = future.result()
+                
+                if result and result != "RATE_LIMITED" and _validate_data(result):
+                    print(f"✅ First success: {source_name}")
+                    
+                    # Signal all other threads to stop
+                    stop_flag.set()
+                    
+                    # Process the successful result
+                    _process_result(symbol, result, source_name, line_tag, x_axis_tag, y_axis_tag, plot_tag)
+                    
+                    # Clean up
+                    if symbol in active_fetches:
+                        del active_fetches[symbol]
+                    return
+                    
+                else:
+                    print(f"❌ {source_name} failed or rate limited")
+                    
+            except Exception as e:
+                print(f"❌ {source_name} error: {e}")
+    
+    # If we get here, all sources failed
+    print(f"❌ All sources failed for {symbol}")
+    if symbol in active_fetches:
+        del active_fetches[symbol]
 
 # =============================================================================
 # DATA SOURCE IMPLEMENTATIONS
 # =============================================================================
 
-def _fetch_yahoo_v8_api(symbol):
-    """Fetch data directly from Yahoo Finance v8 API"""
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+# Replace _fetch_yahoo_v8_api function in stockdx_layer.py
+
+def _quick_yahoo_check(symbol, stop_flag):
+    """Quick Yahoo check with immediate rate limit detection"""
+    if stop_flag.is_set():
+        return None
+        
+    url = f"https://query2.finance.yahoo.com/v8/finance/chart/{symbol}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json",
+    }
+    params = {
+        "period1": int(time.time()) - 86400,
+        "period2": int(time.time()),
+        "interval": "5m",
+        "includePrePost": "false",
+    }
+    
+    try:
+        response = requests.get(url, headers=headers, params=params, timeout=8)
+        
+        if response.status_code == 429:
+            return "RATE_LIMITED"
+        elif response.status_code == 200:
+            return _parse_yahoo_response(response.json())
+        else:
+            return None
+            
+    except Exception:
+        return None
+def _fetch_yahoo_v8_with_stop(symbol, stop_flag):
+    """Yahoo v8 fetch that can be stopped mid-execution"""
+    
+    # Check stop flag before starting
+    if stop_flag.is_set():
+        return None
+    
+    # If we already tried quick check and got rate limited, 
+    # wait a bit then try with full retry logic
+    time.sleep(2)  # Small delay
+    
+    if stop_flag.is_set():
+        return None
+    
+    endpoints = [
+        "https://query2.finance.yahoo.com/v8/finance/chart/",
+        "https://query1.finance.yahoo.com/v8/finance/chart/",
+    ]
     
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Accept": "application/json",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://finance.yahoo.com/",
-        "Origin": "https://finance.yahoo.com",
     }
-    
     params = {
-        "period1": int(time.time()) - 86400,  # 24 hours ago
-        "period2": int(time.time()),          # Now
+        "period1": int(time.time()) - 86400,
+        "period2": int(time.time()),
         "interval": "5m",
-        "includePrePost": "true",
-        "events": "div%2Csplit",
+        "includePrePost": "false",
     }
     
-    response = requests.get(url, headers=headers, params=params, timeout=REQUEST_TIMEOUT)
+    for endpoint in endpoints:
+        if stop_flag.is_set():
+            return None
+            
+        for attempt in range(2):  # Limited retries
+            if stop_flag.is_set():
+                return None
+                
+            try:
+                url = f"{endpoint}{symbol}"
+                response = requests.get(url, headers=headers, params=params, timeout=15)
+                
+                if response.status_code == 200:
+                    return _parse_yahoo_response(response.json())
+                elif response.status_code == 429:
+                    # Still rate limited, wait a bit
+                    for i in range(10):  # Wait 10 seconds, but check stop flag
+                        if stop_flag.is_set():
+                            return None
+                        time.sleep(1)
+                else:
+                    break  # Try next endpoint
+                    
+            except Exception as e:
+                if stop_flag.is_set():
+                    return None
+                continue
     
-    if response.status_code == 200:
-        data = response.json()
+    return None
+
+def _fetch_yfinance_with_stop(symbol, stop_flag):
+    """yfinance fetch that can be stopped"""
+    
+    if stop_flag.is_set():
+        return None
+    
+    try:
+        import yfinance as yf
+        
+        # yfinance doesn't support stop flags directly, 
+        # but we can check before/after the call
+        if stop_flag.is_set():
+            return None
+            
+        ticker = yf.Ticker(symbol)
+        hist = ticker.history(period="1d", interval="5m")
+        
+        if stop_flag.is_set():
+            return None
+        
+        if not hist.empty:
+            # Parse yfinance data
+            volume_data = hist['Volume'].fillna(0) if 'Volume' in hist.columns else []
+            clean_volume = [max(0, int(vol)) for vol in volume_data]
+            
+            return {
+                'close': hist['Close'].tolist(),
+                'open': hist['Open'].tolist(),
+                'high': hist['High'].tolist(),
+                'low': hist['Low'].tolist(),
+                'volume': clean_volume,
+                'timestamps': [int(ts.timestamp()) for ts in hist.index],
+            }
+        
+    except Exception as e:
+        print(f"yfinance error: {e}")
+    
+    return None
+
+
+def _fetch_enhanced_stockdx_with_stop(symbol, stop_flag):
+    """Enhanced stockdx fetch that can be stopped"""
+    
+    if stop_flag.is_set():
+        return None
+    
+    try:
+        from stockdex import Ticker
+        
+        if stop_flag.is_set():
+            return None
+            
+        ticker = Ticker(ticker=symbol)
+        df = ticker.yahoo_api_price(range='1d', dataGranularity='5m')
+        
+        if stop_flag.is_set():
+            return None
+        
+        if df is not None and not df.empty:
+            # Parse stockdx data
+            volume_data = df['volume'].fillna(0) if 'volume' in df.columns else []
+            clean_volume = [max(0, int(vol)) for vol in volume_data]
+            
+            return {
+                'close': df['close'].tolist(),
+                'open': df['open'].tolist() if 'open' in df.columns else [],
+                'high': df['high'].tolist() if 'high' in df.columns else [],
+                'low': df['low'].tolist() if 'low' in df.columns else [],
+                'volume': clean_volume,
+            }
+        
+    except Exception as e:
+        print(f"stockdx error: {e}")
+    
+    return None
+
+def _parse_yahoo_response(data):
+    """Parse Yahoo API response"""
+    try:
         chart = data['chart']['result'][0]
         quotes = chart['indicators']['quote'][0]
+        
+        # Parse volume
+        raw_volume = quotes.get('volume', [])
+        clean_volume = [max(0, int(vol)) if vol is not None else 0 for vol in raw_volume]
         
         return {
             'timestamps': chart['timestamp'],
@@ -100,66 +297,25 @@ def _fetch_yahoo_v8_api(symbol):
             'high': quotes.get('high', []),
             'low': quotes.get('low', []),
             'close': quotes.get('close', []),
-            'volume': quotes.get('volume', []),
+            'volume': clean_volume,
         }
-    else:
-        raise Exception(f"HTTP {response.status_code}: {response.reason}")
+    except Exception:
+        return None
 
-def _fetch_yfinance(symbol):
-    """Fetch data using yfinance library (requires: pip install yfinance)"""
-    try:
-        import yfinance as yf
-        
-        # Create session with proper headers
-        session = requests.Session()
-        session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        })
-        
-        ticker = yf.Ticker(symbol, session=session)
-        hist = ticker.history(period="1d", interval="5m")
-        
-        if not hist.empty:
-            return {
-                'close': hist['Close'].tolist(),
-                'open': hist['Open'].tolist(),
-                'high': hist['High'].tolist(),
-                'low': hist['Low'].tolist(),
-                'volume': hist['Volume'].tolist(),
-                'timestamps': [int(ts.timestamp()) for ts in hist.index],
-            }
-        else:
-            raise Exception("yfinance returned empty dataset")
-            
-    except ImportError:
-        raise Exception("yfinance not installed. Install with: pip install yfinance")
+def _process_result(symbol, data, source_name, line_tag, x_axis_tag, y_axis_tag, plot_tag):
+    """Process the successful result"""
+    print(f"🎯 Processing result from {source_name} for {symbol}")
+    
+    # Use existing processing function
+    _process_successful_fetch(symbol, data, line_tag, x_axis_tag, y_axis_tag, plot_tag)
+    
+    print(f"✅ Completed processing {symbol} from {source_name}")
 
-def _fetch_enhanced_stockdx(symbol):
-    """Fetch data using enhanced stockdx with improved error handling"""
-    from stockdex import Ticker
-    
-    # Temporarily patch the get_response method for better reliability
-    original_method = Ticker.get_response
-    Ticker.get_response = _improved_get_response
-    
-    try:
-        ticker = Ticker(ticker=symbol)
-        df = ticker.yahoo_api_price(range='1d', dataGranularity='5m')
-        
-        if df is not None and not df.empty:
-            return {
-                'close': df['close'].tolist(),
-                'open': df['open'].tolist() if 'open' in df.columns else [],
-                'high': df['high'].tolist() if 'high' in df.columns else [],
-                'low': df['low'].tolist() if 'low' in df.columns else [],
-                'volume': df['volume'].tolist() if 'volume' in df.columns else [],
-            }
-        else:
-            raise Exception("Stockdx returned empty dataset")
-            
-    finally:
-        # Always restore original method
-        Ticker.get_response = original_method
+def stop_all_fetches_for_symbol(symbol):
+    """Stop all active fetches for a symbol (e.g., when user switches stocks)"""
+    if symbol in active_fetches:
+        active_fetches[symbol]['stop_flag'].set()
+        print(f"🛑 Stopped all fetches for {symbol}")
 
 # =============================================================================
 # CHART AND CACHE PROCESSING
@@ -228,33 +384,37 @@ def _update_chart_with_data(data, line_tag, x_axis_tag, y_axis_tag, plot_tag):
         print(f"❌ Error updating chart: {e}")
 
 def _convert_to_dataframe(data):
-    """Convert API data to pandas DataFrame"""
+    """Convert API data to DataFrame - volume already cleaned by each API"""
     try:
         df_data = {}
         
-        # Ensure all arrays are the same length
+        # Find max length
         max_length = max(len(data.get(key, [])) for key in ['open', 'high', 'low', 'close', 'volume'])
         
+        # Process each column - volume is already clean
         for key in ['open', 'high', 'low', 'close', 'volume']:
             values = data.get(key, [])
-            # Pad with None if shorter
+            # Pad to max length
             while len(values) < max_length:
-                values.append(None)
-            df_data[key] = values[:max_length]  # Trim if longer
+                values.append(None if key != 'volume' else 0)
+            df_data[key] = values[:max_length]
         
         df = pd.DataFrame(df_data)
         
-        # Handle timestamps if available
+        # Add timestamps if available
         if 'timestamps' in data and data['timestamps']:
-            df.index = pd.to_datetime(data['timestamps'], unit='s')
+            try:
+                df.index = pd.to_datetime(data['timestamps'], unit='s')
+            except Exception:
+                pass  # Skip timestamp index if it fails
         
         return df
         
     except Exception as e:
         print(f"❌ Error converting to DataFrame: {e}")
-        # Return simple DataFrame with just close prices
+        # Fallback to just close prices
         return pd.DataFrame({'close': data.get('close', [])})
-
+    
 def _cache_comprehensive_data(symbol, price_df):
     """Cache all data including fundamentals"""
     try:
@@ -282,10 +442,7 @@ def _cache_comprehensive_data(symbol, price_df):
                     stock_data.change_percent = (stock_data.change / stock_data.previous_price) * 100
         
         # Extract volume if available
-        if 'volume' in price_df.columns:
-            volume_series = price_df['volume'].dropna()
-            if not volume_series.empty:
-                stock_data.volume = int(volume_series.iloc[-1])
+        _extract_volume_from_cache(price_df, stock_data)
         
         # Fetch fundamental data (safely)
         _fetch_fundamental_data(symbol, stock_data)
@@ -336,14 +493,24 @@ def _fetch_fundamental_data(symbol, stock_data):
 # =============================================================================
 
 def _apply_rate_limiting():
-    """Apply rate limiting to prevent API abuse"""
-    global last_request_time
+    """Apply enhanced rate limiting to prevent API abuse"""
+    global last_request_time, request_count
     
     current_time = time.time()
     time_since_last = current_time - last_request_time
     
-    if time_since_last < RATE_LIMIT_DELAY:
-        sleep_time = RATE_LIMIT_DELAY - time_since_last
+    # Adaptive delay based on request count
+    if request_count > 15:
+        base_delay = 15.0  # Much longer delay after many requests
+    elif request_count > 10:
+        base_delay = 12.0
+    elif request_count > 5:
+        base_delay = 10.0
+    else:
+        base_delay = RATE_LIMIT_DELAY
+    
+    if time_since_last < base_delay:
+        sleep_time = base_delay - time_since_last
         print(f"⏱️ Rate limiting: waiting {sleep_time:.2f} seconds...")
         time.sleep(sleep_time)
     
@@ -351,7 +518,24 @@ def _apply_rate_limiting():
     random_delay = random.uniform(RANDOM_DELAY_MIN, RANDOM_DELAY_MAX)
     print(f"⏱️ Random delay: {random_delay:.2f} seconds...")
     time.sleep(random_delay)
+    
+    # Update counters
+    last_request_time = time.time()
+    request_count += 1
+    
+    # Reset counter periodically
+    if request_count > 20:
+        print("🔄 Resetting request counter and taking longer break...")
+        time.sleep(30)  # Take a 30-second break
+        request_count = 0
 
+def reset_rate_limiting():
+    """Reset rate limiting counters - call this when switching symbols"""
+    global last_request_time, request_count
+    request_count = 0
+    last_request_time = 0
+    print("🔄 Rate limiting counters reset")
+    
 def _validate_data(data):
     """Validate that fetched data is usable"""
     if not data:
@@ -452,6 +636,23 @@ def _extract_cash_flow(cash_flow, stock_data):
     except Exception as e:
         print(f"⚠️ Cash flow extraction failed: {e}")
 
+def _extract_volume_from_cache(price_df, stock_data):
+    """Extract volume from DataFrame - already cleaned by API functions"""
+    try:
+        if 'volume' not in price_df.columns:
+            return
+        
+        # Get the latest non-zero volume
+        volume_series = price_df['volume']
+        for i in range(len(volume_series) - 1, -1, -1):
+            vol = volume_series.iloc[i]
+            if vol > 0:
+                stock_data.volume = int(vol)
+                break
+                
+    except Exception as e:
+        print(f"⚠️ Could not extract volume: {e}")
+        
 def _update_stock_tag_cache(symbol, stock_data):
     """Update stock tag with fresh cache data"""
     try:

@@ -263,10 +263,10 @@ class StockTag:
             if not self.stock_data.is_cache_valid():
                 print(f"📊 Cache expired for {self.symbol}, fetching fresh data...")
                 # Use existing stockdx_layer function - it handles everything
-                from utils.stockdex_layer import fetch_data_from_stockdx
+                from utils.stockdex_layer import fetch_stock_data
                 from components.graph_dpg import current_stock_line_tag, current_x_axis_tag, current_y_axis_tag, current_plot_tag
                 
-                fetch_data_from_stockdx(self.symbol, current_stock_line_tag, current_x_axis_tag, current_y_axis_tag, current_plot_tag)
+                fetch_stock_data(self.symbol, current_stock_line_tag, current_x_axis_tag, current_y_axis_tag, current_plot_tag)
             else:
                 print(f"📶 Using cached data for {self.symbol}")
                 # Load from cache

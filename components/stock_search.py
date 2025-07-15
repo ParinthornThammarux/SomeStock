@@ -5,7 +5,7 @@ import os
 stock_data = None
 chart_tags = {}
 
-from utils.stockdex_layer import fetch_data_from_stockdx
+from utils.stockdex_layer import fetch_stock_data
 from components.stock_data_manager import add_stock_tag
 
 def load_stock_data():
@@ -207,7 +207,7 @@ def row_clicked(stock_data):
             if not tag.stock_data.is_cache_valid():
                 print(f"🔄 Fetching all data for {symbol}")
                 # Use existing stockdx_layer function - it will handle everything
-                fetch_data_from_stockdx(
+                fetch_stock_data(
                     symbol,
                     chart_tags['line_tag'],
                     chart_tags['x_axis_tag'],
