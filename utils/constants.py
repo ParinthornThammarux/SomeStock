@@ -160,22 +160,14 @@ ICON_USER_PLUS = "\uf234"   # Add user
 ICON_USER_MINUS = "\uf503"  # Remove user
 ICON_USER_COG = "\uf4fe"    # User settings
 
-# === SPACING & INVISIBLE CHARACTERS ===
-# Note: Font Awesome doesn't have actual spaces, but these can help with layout
-ICON_INVISIBLE = "\uf83d"   # Actual invisible icon (exists in FA)
-ICON_SPACE_SUBSTITUTE = "⠀"  # Unicode Braille space (U+2800) - invisible but takes space
-ICON_THIN_SPACE = "\u2009"   # Unicode thin space
-ICON_HAIR_SPACE = "\u200a"   # Unicode hair space (very thin)
-ICON_FIGURE_SPACE = "\u2007" # Unicode figure space (width of a digit)
-
 # --- Animation Parameters ---
 ANIMATION_DURATION = 0.2  # seconds
 COLLAPSED_WIDTH = 50
 EXPANDED_WIDTH = 200
 
 # --- User variables
-Cur_User = ""
-
+Cur_User = None
+favorite_stocks = []
 
 # --- Global Font References (will be populated in main_app.py) ---
 default_font_id = None

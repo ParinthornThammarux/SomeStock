@@ -1,4 +1,4 @@
-# pages/user_management_page.py
+# components/user/user_create.py
 
 from datetime import datetime as dt
 import json
@@ -327,14 +327,6 @@ def create_user():
         
         dpg.configure_item("create_btn", enabled=False)
         
-        i = 0
-        while i < 300:
-            i += 1
-            time.sleep(0.01)
-        clear_form()
-        # Auto-clear form after 3 seconds (optional)
-        # You could implement a timer here if desired
-        
     except Exception as e:
         error_msg = f"Error creating user: {str(e)}"
         dpg.set_value("creation_message", error_msg)
@@ -346,6 +338,7 @@ def clear_form():
     from containers.container_content import show_page
     show_page("user_create")
     print("Form cleared")
+    
 def save_user_registration(username, password_hash, pin_hash):
     """Save user registration details to individual JSON file"""
     try:
@@ -409,7 +402,6 @@ def save_user_registration(username, password_hash, pin_hash):
         
         # Show success message and clear form
         show_registration_result(True, username, f"Account created successfully for {username}!")
-        clear_form()
         
     except Exception as e:
         print(f"❌ Error saving user registration: {e}")
@@ -481,8 +473,14 @@ def show_registration_result(success,username, message):
                 label="OK", 
                 width=80, 
                 height=30,
-                callback=lambda: dpg.delete_item("registration_result_window")
+                callback=close_message
             )
+            
+            
+def close_message():
+    clear_form()
+    if dpg.does_item_exist("registration_result_window"):
+        dpg.delete_item("registration_result_window")
 
 
 def go_to_welcome():

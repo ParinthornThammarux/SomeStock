@@ -1,3 +1,5 @@
+# components/user/user_login.py
+
 from datetime import datetime as dt
 import json
 import os
@@ -281,6 +283,7 @@ def attempt_login():
         
         if credential_hash == stored_hash:
             # Successful login
+            print("Set current user to:", username)
             constants.Cur_User = username
             
             # Update welcome message if it exists

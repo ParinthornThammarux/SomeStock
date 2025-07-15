@@ -3,8 +3,8 @@
 # Wraps everything on the right side (excluding sidebar) 
 
 import dearpygui.dearpygui as dpg
-from components.user.create_user import create_user_creation_content
-from components.user.login_user import create_user_login_content
+from components.user.user_create import create_user_creation_content
+from components.user.user_login import create_user_login_content
 from pages.welcome_page import create_welcome_content
 from pages.example_page_b import create_example_page_b_content
 from components.graph_dpg import create_main_graph

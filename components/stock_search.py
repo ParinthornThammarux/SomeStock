@@ -6,7 +6,7 @@ stock_data = None
 chart_tags = {}
 
 from utils.stockdex_layer import fetch_data_from_stockdx
-from components.stock_tag import add_stock_tag
+from components.stock_data_manager import add_stock_tag
 
 def load_stock_data():
     """Load stock data from JSON file on startup"""
@@ -136,7 +136,7 @@ def typing_callback():
     # remove cuz laggy
     for stock in stock_data['stocks']:
         company_name = stock['company_name'].upper()
-        # Check if company name contains the search term
+        # Check if company name starts with the search term
         if company_name.startswith(search_term):
             # Avoid duplicates (in case symbol and name both match)
             if stock not in matching_stocks:
@@ -186,20 +186,41 @@ def typing_callback():
 
             
 def row_clicked(stock_data):
-    #print(f"Selected stock: {stock_data['symbol']} - {stock_data['company_name']}")
+    """Handle stock selection with unified fetch - SIMPLIFIED"""
+    symbol = stock_data['symbol']
+    company_name = stock_data['company_name']
+    
+    print(f"Selected stock: {symbol} - {company_name}")
+    
+    # Close popup
     if dpg.does_item_exist("stock_search_popup"):
         dpg.delete_item("stock_search_popup")
+    
+    # Add stock tag first (creates UI and cache entry)
+    try:
+        from components.stock_data_manager import add_stock_tag
         
-    add_stock_tag(stock_data['symbol'],stock_data['company_name'])
-
-    # fetch and display data (move to inside create stock tag?)
-    fetch_data_from_stockdx(
-        stock_data['symbol'],
-        chart_tags['line_tag'],
-        chart_tags['x_axis_tag'],
-        chart_tags['y_axis_tag'],
-        chart_tags['plot_tag']
-    )
+        tag = add_stock_tag(symbol, company_name)
+        
+        if tag:
+            # Check if we need to fetch data
+            if not tag.stock_data.is_cache_valid():
+                print(f"🔄 Fetching all data for {symbol}")
+                # Use existing stockdx_layer function - it will handle everything
+                fetch_data_from_stockdx(
+                    symbol,
+                    chart_tags['line_tag'],
+                    chart_tags['x_axis_tag'],
+                    chart_tags['y_axis_tag'],
+                    chart_tags['plot_tag']
+                )
+            else:
+                print(f"📶 Using cached data for {symbol}")
+                # Load chart from cache
+                tag.load_chart_from_cache()
+        
+    except Exception as e:
+        print(f"❌ Error adding stock: {e}")
     
 def clear_table_rows(table_tag):
     """Clear all rows from a table while keeping headers"""
