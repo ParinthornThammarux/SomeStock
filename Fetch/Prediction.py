@@ -11,6 +11,9 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from bs4 import BeautifulSoup
+import math
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_squared_error
 
 # ==================== Dataset ====================
 class StockDataset(Dataset):
@@ -28,7 +31,7 @@ class StockDataset(Dataset):
     def __getitem__(self, idx):
         return self.X[idx], self.y[idx]
 
-# ==================== PyTorch Model ====================
+# ==================== Model ====================
 class StockPriceModel(nn.Module):
     def __init__(self, input_size):
         super(StockPriceModel, self).__init__()
@@ -51,16 +54,29 @@ def fetch_data(symbol, period="1y"):
 
 # ==================== Train Model ====================
 def train_model(symbol, window_size=10, epochs=100):
-    prices = fetch_data(symbol)
-    dataset = StockDataset(prices, window_size)
-    loader = DataLoader(dataset, batch_size=16, shuffle=True)
+    df = fetch_data(symbol)
+    close_prices = df["Close"].values.reshape(-1, 1)
+
+    # Scaling
+    scaler = MinMaxScaler()
+    scaled_prices = scaler.fit_transform(close_prices).flatten()
+
+    # Train/test split
+    split = int(len(scaled_prices) * 0.8)
+    train_data = scaled_prices[:split]
+    test_data = scaled_prices[split - window_size:]  # include overlap for context
+
+    train_dataset = StockDataset(train_data, window_size)
+    test_dataset = StockDataset(test_data, window_size)
+    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
 
     model = StockPriceModel(window_size)
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
     for epoch in range(epochs):
-        for x_batch, y_batch in loader:
+        model.train()
+        for x_batch, y_batch in train_loader:
             pred = model(x_batch)
             loss = criterion(pred, y_batch)
 
@@ -68,40 +84,67 @@ def train_model(symbol, window_size=10, epochs=100):
             loss.backward()
             optimizer.step()
 
+    # Evaluate RMSE
+    model.eval()
+    test_X = torch.tensor(test_dataset.X)
+    preds = model(test_X).detach().numpy()
+    y_true = test_dataset.y
+    rmse = math.sqrt(mean_squared_error(y_true, preds))
+    print(f"📉 Test RMSE: {rmse:.4f}")
+
+    # Save model + scaler
     os.makedirs("Model", exist_ok=True)
-    model_path = f"Model/{symbol}_model.pt"
-    torch.save(model.state_dict(), model_path)
-    print(f"✅ Model saved to {model_path}")
-    return model
+    torch.save(model.state_dict(), f"Model/{symbol}_model.pt")
+    np.save(f"Model/{symbol}_scaler.npy", scaler.data_max_)
+    print(f"✅ Model & scaler saved for {symbol}")
+
+    return model, scaler
 
 # ==================== Load Model ====================
 def load_model(symbol, window_size=10):
     model = StockPriceModel(window_size)
-    model_path = f"Model/{symbol}_model.pt"
-    if os.path.exists(model_path):
-        model.load_state_dict(torch.load(model_path))
+    path = f"Model/{symbol}_model.pt"
+    if os.path.exists(path):
+        model.load_state_dict(torch.load(path))
         model.eval()
-        print(f"📂 Loaded model from {model_path}")
+        print(f"📂 Loaded model from {path}")
         return model
     return None
 
-# ==================== Predict Next Price ====================
+def load_scaler(symbol):
+    path = f"Model/{symbol}_scaler.npy"
+    if os.path.exists(path):
+        max_val = np.load(path)
+        scaler = MinMaxScaler()
+        scaler.fit(np.array([[0], [max_val]]))
+        return scaler
+    return None
+
+# ==================== Predict ====================
 def predict_next_price(symbol, window_size=10):
-    prices = fetch_data(symbol)
+    df = fetch_data(symbol)
+    close_prices = df["Close"].values.reshape(-1, 1)
+
+    scaler = load_scaler(symbol)
     model = load_model(symbol, window_size)
-    if model is None:
-        model = train_model(symbol, window_size)
 
-    recent_prices = prices[-window_size:]
-    input_tensor = torch.tensor(recent_prices, dtype=torch.float32).unsqueeze(0)
+    if model is None or scaler is None:
+        model, scaler = train_model(symbol, window_size)
+
+    scaled_prices = scaler.transform(close_prices).flatten()
+    recent = scaled_prices[-window_size:]
+    input_tensor = torch.tensor(recent, dtype=torch.float32).unsqueeze(0)
+
     with torch.no_grad():
-        predicted = model(input_tensor).item()
+        pred_scaled = model(input_tensor).item()
+        predicted_price = scaler.inverse_transform([[pred_scaled]])[0][0]
 
-    print(f"📈 {symbol} - Predicted next close price: ${predicted:.2f}")
+    print(f"📈 {symbol} - Predicted next close price: ${predicted_price:.2f}")
 
-    plt.plot(np.arange(len(prices)), prices, label='Actual Price')
-    plt.scatter(len(prices), predicted, color='red', label='Predicted Price')
-    plt.title(f"{symbol} - PyTorch Forecast")
+    # Plot
+    plt.plot(np.arange(len(close_prices)), close_prices, label="Actual Price")
+    plt.scatter(len(close_prices), predicted_price, color="red", label="Predicted")
+    plt.title(f"{symbol} - Forecasted Price")
     plt.xlabel("Days")
     plt.ylabel("Price")
     plt.legend()
@@ -109,7 +152,7 @@ def predict_next_price(symbol, window_size=10):
     plt.tight_layout()
     plt.show()
 
-    return predicted
+    return predicted_price
 
 # ==================== RSI Prediction ====================
 def predict_rsi(symbol):
