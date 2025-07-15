@@ -11,10 +11,10 @@ from utils.matplotlib_integration import DPGMatplotlibIntegration
 from utils.plotly_integration import PlotlyInteractiveIntegration
 
 # Import them from relative files
-from components.graph_dpg import create_main_graph
-from components.graph_advanced import create_advanced_analysis_tab
-from components.graph_interactive import create_interactive_tab
-from components.graph_sankey import create_sankey_tab
+from components.graph.graph_dpg import create_main_graph
+from components.graph.graph_advanced import create_advanced_analysis_tab
+from components.graph.graph_interactive import create_interactive_tab
+from components.graph.graph_sankey import create_sankey_tab
 
 # Global variables
 current_stock_line_tag = None

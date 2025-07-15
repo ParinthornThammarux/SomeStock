@@ -7,7 +7,7 @@ from components.user.user_create import create_user_creation_content
 from components.user.user_login import create_user_login_content
 from pages.welcome_page import create_welcome_content
 from pages.example_page_b import create_example_page_b_content
-from components.graph_dpg import create_main_graph
+from components.graph.graph_dpg import create_main_graph
 from containers.container_graph_tabs import create_graph_tabs
 
 # Global variable to track current page
@@ -29,6 +29,7 @@ def create_main_content(parent_tag):
             # Initially load welcome page
             show_page("welcome")
 
+# Switches Pages in the content container
 def show_page(page_name):
     """
     Clears the page container and loads the specified page content.
@@ -43,37 +44,44 @@ def show_page(page_name):
         print("Cleared existing page content")
     
     # Load new page content based on page name
-    if page_name == "welcome":
-        create_welcome_content("page_content_container")
-        current_page = "welcome"
-    elif page_name == "main":
-        create_main_graph("page_content_container")  # Original simple chart
-        current_page = "main"
-    elif page_name == "enhanced":  # New enhanced page
-        create_main_graph("page_content_container")
-        current_page = "enhanced"
-    elif page_name == "page_b":
-        create_graph_tabs("page_content_container")
-        current_page = "page_b"
-        print("Loaded page B content")
-    elif page_name == "user_create":
-        current_page = "user_create"
-        create_user_creation_content("page_content_container")
-        print("Loaded User_create")
-    elif page_name == "user_login":
-        current_page = "user_login"
-        create_user_login_content("page_content_container")
-        print("Loaded User_create")
-    elif page_name == "indicator":
-        # Import here to avoid circular import issues
-        from pages.Indicator_page import Create_Indicator_page
-        Create_Indicator_page("page_content_container")
-        current_page = "indicator"
-        print("Loaded indicator page content")
-    else:
-        # Default fallback
-        dpg.add_text("Page not found", parent="page_content_container", color=[255, 0, 0])
-        print(f"Unknown page: {page_name}")
+    match page_name:
+        case "welcome":
+            create_welcome_content("page_content_container")
+            current_page = "welcome"
+        case "main":
+            create_main_graph("page_content_container")  # Original simple chart
+            current_page = "main"
+        case "enhanced":
+            create_main_graph("page_content_container")
+            current_page = "enhanced"
+        case "create_hailun_content":
+            # Hailun page content
+            from pages.Hailun_page import create_hailun_content
+            create_hailun_content("page_content_container")
+            current_page = "hailun"
+            print("Loaded indicator page content")
+        case "page_b":
+            create_graph_tabs("page_content_container")
+            current_page = "page_b"
+            print("Loaded page B content")
+        case "user_create":
+            current_page = "user_create"
+            create_user_creation_content("page_content_container")
+            print("Loaded User_create")
+        case "user_login":
+            current_page = "user_login"
+            create_user_login_content("page_content_container")
+            print("Loaded User_create")
+        case "indicator":
+            # Import here to avoid circular import issues
+            from pages.Indicator_page import Create_Indicator_page
+            Create_Indicator_page("page_content_container")
+            current_page = "indicator"
+            print("Loaded indicator page content")
+        case _:  # Default case
+            dpg.add_text("Page not found", parent="page_content_container", color=[255, 0, 0])
+            print(f"Unknown page: {page_name}")
+            current_page = None
 
 def get_current_page():
     

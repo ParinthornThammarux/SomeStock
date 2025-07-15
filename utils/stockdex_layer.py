@@ -668,7 +668,7 @@ def _update_stock_tag_cache(symbol, stock_data):
 def _add_to_portfolio_table(symbol):
     """Add stock to portfolio table"""
     try:
-        from components.graph_dpg import add_stock_to_portfolio_table
+        from components.graph.graph_dpg import add_stock_to_portfolio_table
         add_stock_to_portfolio_table(symbol)
     except Exception as e:
         print(f"⚠️ Could not add to portfolio table: {e}")
@@ -695,25 +695,3 @@ def update_chart(df, line_tag, x_axis_tag, y_axis_tag, plot_tag):
 def cache_comprehensive_data(symbol, price_df, ticker):
     """Legacy function - caches data without ticker dependency"""
     _cache_comprehensive_data(symbol, price_df)
-
-# =============================================================================
-# REMOVED DUPLICATE FUNCTIONS
-# =============================================================================
-
-# The following functions were removed as they were duplicates:
-# - fetch_with_improved_stockdx() -> merged into _fetch_enhanced_stockdx()
-# - enhanced_fetch_data_from_stockdx() -> functionality moved to main function
-# - fetch_with_yfinance() -> renamed to _fetch_yfinance()
-# - update_chart_with_data() -> renamed to _update_chart_with_data()
-# - update_dpg_chart() -> functionality merged into _update_chart_with_data()
-
-# =============================================================================
-# CLEAN ARCHITECTURE
-# =============================================================================
-
-# Now we have ONE clear path:
-# 1. fetch_data_from_stockdx() - Main entry point
-# 2. _fetch_yahoo_v8_api() - Direct Yahoo API
-# 3. _fetch_yfinance() - yfinance library  
-# 4. _fetch_enhanced_stockdx() - Enhanced stockdx with better error handling
-# 5. All processing happens in _process_successful_fetch()

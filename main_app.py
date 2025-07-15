@@ -1,4 +1,4 @@
-# main_app.py - Updated for new page system
+# main_app.py
 
 import dearpygui.dearpygui as dpg
 import time
@@ -68,26 +68,6 @@ def toggle_sidebar(sender, app_data, user_data):
 
     dpg.set_frame_callback(dpg.get_frame_count() + 1, animate_sidebar)
 
-# Updated callback function for main_app.py
-
-def icon_button_callback(sender, app_data, user_data):
-    """Updated callback to use the new page system including enhanced charts"""
-    button_label = dpg.get_item_label(sender)
-    print(f"Button '{button_label}' (tag: {sender}) clicked!")
-
-    # Show page stuff put here!!! if we have more pages we can put it
-    if sender == "dashboard_icon_btn" or button_label == "Dashboard":
-        show_page("enhanced")  # send to graph container
-    elif sender == "search_icon_btn" or button_label == "Search":
-        show_page("page_b")
-    elif sender == "portfolio_icon_btn" or button_label == "Portfolio":
-        show_page("welcome")  # main as forback
-    elif sender == "add_icon_btn" or button_label == "Add Item":
-        show_page("page_b")
-    elif sender == "remove_icon_btn" or button_label == "Remove Item":
-        show_page("page_b")
-    elif sender == "Indicator_icon_btn" or button_label == "Indicator":
-        show_page("indicator")
 
 def main():
     dpg.create_context()
@@ -103,7 +83,6 @@ def main():
             create_sidebar(
                 parent_tag="root_group",
                 toggle_callback=toggle_sidebar,
-                icon_button_callback=icon_button_callback,
                 initial_width=constants.COLLAPSED_WIDTH  
             )
             create_main_content(parent_tag="root_group")

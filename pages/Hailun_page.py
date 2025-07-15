@@ -1,10 +1,10 @@
-# components/welcome_page.py - Updated for new system
+# components/Hailun_page.py for Hailun 
 
 import dearpygui.dearpygui as dpg
 import os
 from utils import constants
 
-def create_welcome_content(parent_tag):
+def create_hailun_content(parent_tag):
     """
     Creates the welcome page content directly in the parent container.
     No child windows - just content.
@@ -35,7 +35,7 @@ def create_welcome_content(parent_tag):
             # Centered content group
             with dpg.group(horizontal=False):
                 # Welcome Title (large font)
-                title_text = dpg.add_text("Welcome to SomeStock", color=[255, 255, 255])
+                title_text = dpg.add_text("Welcome to Hailun", color=[255, 255, 255])
                 dpg.bind_item_font(title_text, large_font)
                 dpg.add_spacer(height=15)
                 

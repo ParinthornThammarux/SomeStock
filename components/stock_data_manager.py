@@ -264,7 +264,7 @@ class StockTag:
                 print(f"📊 Cache expired for {self.symbol}, fetching fresh data...")
                 # Use existing stockdx_layer function - it handles everything
                 from utils.stockdex_layer import fetch_stock_data
-                from components.graph_dpg import current_stock_line_tag, current_x_axis_tag, current_y_axis_tag, current_plot_tag
+                from components.graph.graph_dpg import current_stock_line_tag, current_x_axis_tag, current_y_axis_tag, current_plot_tag
                 
                 fetch_stock_data(self.symbol, current_stock_line_tag, current_x_axis_tag, current_y_axis_tag, current_plot_tag)
             else:
@@ -283,7 +283,7 @@ class StockTag:
                 print(f"❌ No cached chart data for {self.symbol}")
                 return
             
-            from components.graph_dpg import current_stock_line_tag, current_x_axis_tag, current_y_axis_tag, current_plot_tag
+            from components.graph.graph_dpg import current_stock_line_tag, current_x_axis_tag, current_y_axis_tag, current_plot_tag
             
             df = self.stock_data.price_history
             
@@ -443,7 +443,7 @@ def get_stock_data_for_table(symbol: str) -> Dict[str, Any]:
 def add_stock_to_table(symbol):
     """Add stock to the main graph table"""
     try:
-        from components.graph_dpg import add_stock_to_portfolio_table
+        from components.graph.graph_dpg import add_stock_to_portfolio_table
         add_stock_to_portfolio_table(symbol)
     except ImportError as e:
         print(f"Could not import graph_dpg: {e}")
