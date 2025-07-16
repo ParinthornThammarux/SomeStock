@@ -5,8 +5,8 @@ import os
 stock_data = None
 chart_tags = {}
 
-from utils.stockdex_layer import fetch_stock_data
-from components.stock_data_manager import add_stock_tag
+from utils.stock_fetch_layer import fetch_stock_data
+from components.stock.stock_data_manager import add_stock_tag
 
 def load_stock_data():
     """Load stock data from JSON file on startup"""
@@ -198,7 +198,7 @@ def row_clicked(stock_data):
     
     # Add stock tag first (creates UI and cache entry)
     try:
-        from components.stock_data_manager import add_stock_tag
+        from components.stock.stock_data_manager import add_stock_tag
         
         tag = add_stock_tag(symbol, company_name)
         

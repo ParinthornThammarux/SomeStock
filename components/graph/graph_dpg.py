@@ -10,7 +10,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from utils import constants
-from utils.stockdex_layer import fetch_stock_data
+from utils.stock_fetch_layer import fetch_stock_data
 from components.stock_search import create_stock_search
 
 # Global variables to track current chart components
@@ -172,7 +172,7 @@ def fav_button_callback():
     """Heart button callback"""
     print("Heart button clicked!")
     # Show favorited stocks
-    from components.stock_data_manager import get_favorited_stocks
+    from components.stock.stock_data_manager import get_favorited_stocks
     favorites = get_favorited_stocks()
     print(f"Favorited stocks: {favorites}")
 
@@ -210,7 +210,7 @@ def refresh_all_cache():
     print("🔄 Refreshing all cached stock data...")
     
     try:
-        from components.stock_data_manager import get_all_stock_tags
+        from components.stock.stock_data_manager import get_all_stock_tags
         
         stock_tags = get_all_stock_tags()
         
@@ -237,7 +237,7 @@ def refresh_all_cache():
 def save_cache():
     """Save cache to file"""
     try:
-        from components.stock_data_manager import save_cache_to_file, cleanup_cache
+        from components.stock.stock_data_manager import save_cache_to_file, cleanup_cache
         
         cleanup_cache()  # Clean up old entries first
         save_cache_to_file()
@@ -271,7 +271,7 @@ def refresh_table_data():
         dpg.add_table_column(label="Cache", width_fixed=True, init_width_or_weight=80, parent=current_table_tag)
         
         # Repopulate with all stocks
-        from components.stock_data_manager import get_all_stock_tags
+        from components.stock.stock_data_manager import get_all_stock_tags
         
         stock_tags = get_all_stock_tags()
         for tag in stock_tags:
@@ -285,7 +285,7 @@ def refresh_table_data():
 def export_data():
     """Export portfolio data to CSV"""
     try:
-        from components.stock_data_manager import stock_data_cache, get_all_stock_tags
+        from components.stock.stock_data_manager import stock_data_cache, get_all_stock_tags
         import csv
         import datetime
         
@@ -351,7 +351,7 @@ def add_stock_to_portfolio_table(symbol):
             return
         
         # Get cached data
-        from components.stock_data_manager import get_stock_data_for_table
+        from components.stock.stock_data_manager import get_stock_data_for_table
         
         data = get_stock_data_for_table(symbol)
         

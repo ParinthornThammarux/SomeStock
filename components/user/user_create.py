@@ -9,6 +9,24 @@ import random
 import time
 from utils import constants
 
+def create_base_user():
+    file_path = "registered_users/base_user.json"
+    if os.path.exists(file_path):
+        print("Base user exists, skipping creation.")
+    else:
+        print("Creating base user")
+        base_user = {
+            "username": "base_user",
+            "created_date": dt.now().isoformat(),
+            "favorite_stocks": [],
+            "displayed_stocks": []
+        }
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(base_user, f, indent=2, ensure_ascii=False)
+        print(f"Base user created at {file_path}")
+    constants.Cur_User = "Base"
+    dpg.set_value("user_welcome_message", "Base")
+        
 def create_user_creation_content(parent_tag):
     """
     Creates the user management page content directly in the parent container.

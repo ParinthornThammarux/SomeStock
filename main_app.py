@@ -6,6 +6,7 @@ from components.sidebar import create_sidebar
 from containers.container_content import create_main_content, show_page
 from components.stock_search import load_stock_data
 from components.topbar_stuff import create_top_menu
+from components.user.user_create import create_base_user
 from utils import constants
 
 # --- Animation State Variables ---
@@ -88,6 +89,7 @@ def main():
             create_main_content(parent_tag="root_group")
             
     load_stock_data()
+    create_base_user()
     dpg.set_primary_window("main_window", True)
     dpg.show_viewport()
     dpg.start_dearpygui()
