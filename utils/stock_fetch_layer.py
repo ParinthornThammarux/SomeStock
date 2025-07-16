@@ -53,7 +53,7 @@ def fetch_stock_data(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag):
     sources = [
         ("yfinance Complete", _fetch_yfinance_complete),
         ("yahooquery Complete", _fetch_yahoo_complete),
-        ("stockdx Complete", _fetch_stockdx_complete),
+        ("stockdx Complete", _fetch_stockdex_complete),
     ]
     
     # Try sources in parallel - first to succeed wins
@@ -434,7 +434,7 @@ def _parse_yahoo_comprehensive_fundamentals(data):
     except Exception as e:
         print(f"❌ Error parsing comprehensive Yahoo fundamentals: {e}")
         return {}
-def _fetch_stockdx_complete(symbol, stop_flag):
+def _fetch_stockdex_complete(symbol, stop_flag):
     """Fetch complete data from stockdx in one call"""
     if stop_flag.is_set():
         return None

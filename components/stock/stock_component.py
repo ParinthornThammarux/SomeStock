@@ -320,10 +320,21 @@ class StockTag:
         """Refresh stock data from API"""
         print(f"🔄 Refreshing data for {self.symbol}...")
         try:
-            # This would call your stockdx layer to fetch fresh data
-            from utils.stock_fetch_layer import fetch_data_from_stockdx
-            # Note: You'll need to pass the chart tags when available
-            # fetch_data_from_stockdx(self.symbol, ...)
+            # Get current chart tags
+            from components.graph.graph_dpg import current_stock_line_tag, current_x_axis_tag, current_y_axis_tag, current_plot_tag
+            
+            if current_stock_line_tag and current_x_axis_tag and current_y_axis_tag and current_plot_tag:
+                # Use existing stockdx layer function to fetch fresh data
+                from utils.stock_fetch_layer import fetch_stock_data
+                fetch_stock_data(
+                    self.symbol,
+                    current_stock_line_tag,
+                    current_x_axis_tag,
+                    current_y_axis_tag,
+                    current_plot_tag
+                )
+            else:
+                print(f"❌ Chart tags not available for {self.symbol}")
             
             # Update cache indicator after refresh
             self.update_cache_indicator()
@@ -338,11 +349,30 @@ class StockTag:
                 print(f"❌ No cached chart data for {self.symbol}")
                 return False
             
-            # This would update the chart using your graph_dpg functions
-            # You'll need to import and call the appropriate chart update functions
-            print(f"📊 Loading chart from cache for {self.symbol}")
+            # Import the chart update function
+            from components.graph.graph_dpg import current_stock_line_tag, current_x_axis_tag, current_y_axis_tag, current_plot_tag
+            from utils.stock_fetch_layer import _update_chart_with_data
+            
+            # Convert DataFrame to data format expected by chart updater
+            df = self.stock_data.price_history
+            data = {
+                'close': df['close'].tolist(),
+                'open': df['open'].tolist() if 'open' in df.columns else [],
+                'high': df['high'].tolist() if 'high' in df.columns else [],
+                'low': df['low'].tolist() if 'low' in df.columns else [],
+                'volume': df['volume'].tolist() if 'volume' in df.columns else [],
+            }
+            
+            # Update the chart
+            _update_chart_with_data(data, current_stock_line_tag, current_x_axis_tag, current_y_axis_tag, current_plot_tag)
+            
+            print(f"📊 Chart loaded from cache for {self.symbol}")
             return True
             
+        except Exception as e:
+            print(f"❌ Error loading chart from cache: {e}")
+            return False
+                
         except Exception as e:
             print(f"❌ Error loading chart from cache: {e}")
             return False
@@ -388,16 +418,18 @@ class StockTag:
         """Handle chart button click"""
         print(f"📈 Chart clicked for {self.symbol}")
         self.set_focus(True)
-        
+
         if self.on_chart_click:
             self.on_chart_click(self)
         else:
             # Default behavior: try to load chart
             if not self.stock_data.is_cache_valid():
+                print(f"🔄 Cache expired for {self.symbol}, fetching fresh data...")
                 self.refresh_data()
             else:
+                print(f"📦 Using cached data for {self.symbol}")
                 self.load_chart_from_cache()
-    
+
     def _on_heart_clicked(self):
         """Handle heart button click"""
         self.toggle_favorite()
