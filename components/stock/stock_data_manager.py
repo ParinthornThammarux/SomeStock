@@ -25,8 +25,13 @@ from components.stock.stock_component import (
     
     # Constants
     CACHE_DURATION,
-    MAX_CACHE_SIZE
+    MAX_CACHE_SIZE,
+    
+    _stock_data_cache
 )
+
+# Add this alias for backward compatibility
+stock_data_cache = _stock_data_cache
 
 # Legacy compatibility - these functions maintain the old interface
 def add_stock_tag(symbol, company_name, parent="tags_container"):
@@ -72,6 +77,7 @@ __all__ = [
     'get_stock_data_for_table',
     'save_cache_to_file',
     'load_cache_from_file',
+    'stock_data_cache',
     'cleanup_cache',
     'CACHE_DURATION',
     'MAX_CACHE_SIZE'

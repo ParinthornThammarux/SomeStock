@@ -380,7 +380,7 @@ def add_stock_to_portfolio_table(symbol):
             dpg.add_text(data['cash_flow'])
             
             # Cache status indicator
-            cache_status = "📶 Fresh" if data['is_cached'] else "🔄 Stale"
+            cache_status = "Fresh" if data['is_cached'] else "Stale"
             cache_color = [0, 255, 0] if data['is_cached'] else [255, 150, 0]
             dpg.add_text(cache_status, color=cache_color)
         

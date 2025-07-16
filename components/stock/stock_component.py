@@ -225,10 +225,8 @@ class StockTag:
     def _create_symbol_text(self, text_color):
         """Create the stock symbol text with cache indicator"""
         cache_indicator = "Fresh" if self.stock_data.is_cache_valid() else "Stale"
-        display_text = f"{cache_indicator[:1]} {self.symbol}"  # F AAPL or S AAPL
         
-        dpg.add_text(
-            display_text, 
+        dpg.add_text( 
             pos=[5, 5], 
             color=text_color, 
             tag=f"{self.tag_id}_text"
@@ -314,8 +312,8 @@ class StockTag:
     def update_cache_indicator(self):
         """Update the cache indicator in the tag"""
         if dpg.does_item_exist(f"{self.tag_id}_text"):
-            cache_indicator = "Fresh" if self.stock_data.is_cache_valid() else "Stale"
-            display_text = f"{cache_indicator[:1]} {self.symbol}"
+            # cache_indicator = "Fresh" if self.stock_data.is_cache_valid() else "Stale"
+            display_text = f"{self.symbol}"
             dpg.set_value(f"{self.tag_id}_text", display_text)
     
     def refresh_data(self):
