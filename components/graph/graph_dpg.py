@@ -1,4 +1,4 @@
-# components/graph_dpg.py
+# components/graph/graph_dpg.py
 
 import dearpygui.dearpygui as dpg
 import math
@@ -18,14 +18,18 @@ current_stock_line_tag = None
 current_x_axis_tag = None
 current_y_axis_tag = None
 current_plot_tag = None
+current_table_tag = None
+
+# Thread lock for table operations
+table_lock = threading.Lock()
 
 def create_main_graph(parent_tag, timestamp=None):
     """
     Creates a content page with a graph on top and a table below.
-    Now works with the new caching system.
+    Now works with the new caching system and prevents duplicates.
     """
     # GLOBAL DECLARATION MUST BE FIRST IN FUNCTION
-    global current_stock_line_tag, current_x_axis_tag, current_y_axis_tag, current_plot_tag
+    global current_stock_line_tag, current_x_axis_tag, current_y_axis_tag, current_plot_tag, current_table_tag
     
     print(f"Creating graph and table content in parent: {parent_tag}")
     
@@ -116,13 +120,13 @@ def create_main_graph(parent_tag, timestamp=None):
         dpg.add_spacer(height=5)
         
         # Create table with unique tag
-        global table_tag
         table_tag = f"portfolio_table_{timestamp}"
         table_container_tag = f"table_container_{timestamp}"
         
+        # Store table tag globally
+        current_table_tag = table_tag
+        
         with dpg.child_window(width=-1, height=-1, tag=table_container_tag, border=False):
-            global current_table_tag
-            current_table_tag = table_tag
             with dpg.table(
                 header_row=True,
                 borders_innerH=True,
@@ -155,6 +159,8 @@ def create_main_graph(parent_tag, timestamp=None):
             dpg.add_button(label="Save Cache", callback=save_cache, width=120)
             dpg.add_spacer(width=10)
             dpg.add_button(label="Export CSV", callback=export_data, width=120)
+            dpg.add_spacer(width=10)
+            dpg.add_button(label="Clear Table", callback=clear_table, width=120)
             dpg.add_spacer(width=10)
             dpg.add_button(label="Back to Welcome", callback=go_to_welcome, width=150)
 
@@ -247,40 +253,153 @@ def save_cache():
     except Exception as e:
         print(f"❌ Error saving cache: {e}")
 
+def clear_table():
+    """Clear all entries from the table"""
+    global current_table_tag, table_lock
+    
+    with table_lock:
+        try:
+            if not current_table_tag or not dpg.does_item_exist(current_table_tag):
+                print("❌ Table not found")
+                return
+            
+            # Get table children (rows)
+            children = dpg.get_item_children(current_table_tag, slot=1)  # slot 1 = table rows
+            if children:
+                for row_id in children:
+                    if dpg.get_item_type(row_id) == "mvAppItemType::mvTableRow":
+                        dpg.delete_item(row_id)
+            
+            print("✅ Table cleared")
+            
+        except Exception as e:
+            print(f"❌ Error clearing table: {e}")
+
+def symbol_exists_in_table(symbol):
+    """Thread-safe check if symbol already exists in the portfolio table"""
+    global current_table_tag, table_lock
+    
+    with table_lock:
+        try:
+            if not current_table_tag or not dpg.does_item_exist(current_table_tag):
+                return False
+            
+            # Get table children (rows)
+            children = dpg.get_item_children(current_table_tag, slot=1)  # slot 1 = table rows
+            if not children:
+                return False
+            
+            # Check each row for the symbol
+            for row_id in children:
+                if dpg.get_item_type(row_id) == "mvAppItemType::mvTableRow":
+                    row_children = dpg.get_item_children(row_id, slot=1)
+                    if row_children and len(row_children) > 0:
+                        # First cell should contain the symbol
+                        first_cell = row_children[0]
+                        if dpg.does_item_exist(first_cell):
+                            cell_value = dpg.get_value(first_cell)
+                            if cell_value == symbol:
+                                return True
+            
+            return False
+            
+        except Exception as e:
+            print(f"❌ Error checking table for symbol {symbol}: {e}")
+            return False
+
 def refresh_table_data():
-    """Refresh all table data from cache"""
+    """Refresh all table data from cache - THREAD SAFE"""
+    global current_table_tag, table_lock
+    
+    with table_lock:
+        try:
+            if not current_table_tag or not dpg.does_item_exist(current_table_tag):
+                print("❌ Table not found")
+                return
+            
+            # Clear existing table data (keep headers)
+            children = dpg.get_item_children(current_table_tag, slot=1)  # slot 1 = table rows
+            if children:
+                for row_id in children:
+                    if dpg.get_item_type(row_id) == "mvAppItemType::mvTableRow":
+                        dpg.delete_item(row_id)
+            
+            # Repopulate with all stocks
+            from components.stock.stock_data_manager import get_all_stock_tags
+            
+            stock_tags = get_all_stock_tags()
+            for tag in stock_tags:
+                _add_stock_to_table_internal(tag.symbol)
+            
+            print(f"✅ Table refreshed with {len(stock_tags)} stocks")
+            
+        except Exception as e:
+            print(f"❌ Error refreshing table: {e}")
+
+def add_stock_to_portfolio_table(symbol):
+    """Public interface - Add a stock row to the portfolio table using cached data - THREAD SAFE"""
+    global table_lock
+    
+    with table_lock:
+        try:
+            # Check if symbol already exists
+            if symbol_exists_in_table(symbol):
+                print(f"📋 {symbol} already exists in table, skipping addition")
+                return
+            
+            _add_stock_to_table_internal(symbol)
+            print(f"✅ Added {symbol} to table (thread-safe)")
+            
+        except Exception as e:
+            print(f"❌ Failed to add {symbol} to table: {e}")
+
+def _add_stock_to_table_internal(symbol):
+    """Internal function to add stock to table - assumes lock is held"""
     global current_table_tag
     
     try:
         if not current_table_tag or not dpg.does_item_exist(current_table_tag):
-            print("❌ Table not found")
+            print("❌ Portfolio table not found")
             return
         
-        # Clear existing table data
-        dpg.delete_item(current_table_tag, children_only=True)
+        # Get cached data
+        from components.stock.stock_data_manager import get_stock_data_for_table
         
-        # Recreate table columns
-        dpg.add_table_column(label="Symbol", width_fixed=True, init_width_or_weight=80, parent=current_table_tag)
-        dpg.add_table_column(label="Company", width_fixed=True, init_width_or_weight=200, parent=current_table_tag)
-        dpg.add_table_column(label="Price", width_fixed=True, init_width_or_weight=100, parent=current_table_tag)
-        dpg.add_table_column(label="Change", width_fixed=True, init_width_or_weight=100, parent=current_table_tag)
-        dpg.add_table_column(label="Volume", width_fixed=True, init_width_or_weight=100, parent=current_table_tag)
-        dpg.add_table_column(label="Revenue", width_fixed=True, init_width_or_weight=120, parent=current_table_tag)
-        dpg.add_table_column(label="Net Income", width_fixed=True, init_width_or_weight=120, parent=current_table_tag)
-        dpg.add_table_column(label="Cash Flow", width_fixed=True, init_width_or_weight=120, parent=current_table_tag)
-        dpg.add_table_column(label="Cache", width_fixed=True, init_width_or_weight=80, parent=current_table_tag)
+        data = get_stock_data_for_table(symbol)
         
-        # Repopulate with all stocks
-        from components.stock.stock_data_manager import get_all_stock_tags
+        if not data:
+            print(f"❌ No data available for {symbol}")
+            return
         
-        stock_tags = get_all_stock_tags()
-        for tag in stock_tags:
-            add_stock_to_portfolio_table(tag.symbol)
-        
-        print(f"✅ Table refreshed with {len(stock_tags)} stocks")
+        # Add new row to the table
+        with dpg.table_row(parent=current_table_tag):
+            dpg.add_text(data['symbol'])
+            dpg.add_text(data['company_name'][:20] + "..." if len(data['company_name']) > 20 else data['company_name'])
+            dpg.add_text(data['current_price'])
+            dpg.add_text(data['change'], color=data['change_color'])
+            dpg.add_text(data['volume'])
+            dpg.add_text(data['revenue'])
+            
+            # Color-code net income
+            ni_color = [255, 255, 255]  # Default white
+            if data['net_income'] != "N/A":
+                if not data['net_income'].startswith("-"):
+                    ni_color = [0, 255, 0]  # Green for positive
+                else:
+                    ni_color = [255, 0, 0]  # Red for negative
+            
+            dpg.add_text(data['net_income'], color=ni_color)
+            dpg.add_text(data['cash_flow'])
+            
+            # Cache status indicator
+            cache_status = "Fresh" if data['is_cached'] else "Stale"
+            cache_color = [0, 255, 0] if data['is_cached'] else [255, 150, 0]
+            dpg.add_text(cache_status, color=cache_color)
         
     except Exception as e:
-        print(f"❌ Error refreshing table: {e}")
+        print(f"❌ Internal error adding {symbol} to table: {e}")
+        import traceback
+        traceback.print_exc()
 
 def export_data():
     """Export portfolio data to CSV"""
@@ -327,7 +446,7 @@ def export_data():
                     stock_data.cash_flow or 'N/A',
                     datetime.datetime.fromtimestamp(stock_data.last_updated).strftime("%Y-%m-%d %H:%M:%S") if stock_data.last_updated else 'N/A',
                     'Valid' if stock_data.is_cache_valid() else 'Expired',
-                    'Yes' if tag.get_favorite_status() else 'No'
+                    'Yes' if tag.is_favorite() else 'No'
                 ])
         
         print(f"✅ Portfolio exported to {filename}")
@@ -340,56 +459,6 @@ def go_to_welcome():
     print("Going back to welcome page")
     from containers.container_content import show_page
     show_page("welcome")
-
-def add_stock_to_portfolio_table(symbol):
-    """Add a stock row to the portfolio table using cached data"""
-    global current_table_tag
-    
-    try:
-        if not current_table_tag or not dpg.does_item_exist(current_table_tag):
-            print("❌ Portfolio table not found")
-            return
-        
-        # Get cached data
-        from components.stock.stock_data_manager import get_stock_data_for_table
-        
-        data = get_stock_data_for_table(symbol)
-        
-        if not data:
-            print(f"❌ No data available for {symbol}")
-            return
-        
-        # Add new row to the table
-        with dpg.table_row(parent=current_table_tag):
-            dpg.add_text(data['symbol'])
-            dpg.add_text(data['company_name'][:20] + "..." if len(data['company_name']) > 20 else data['company_name'])
-            dpg.add_text(data['current_price'])
-            dpg.add_text(data['change'], color=data['change_color'])
-            dpg.add_text(data['volume'])
-            dpg.add_text(data['revenue'])
-            
-            # Color-code net income
-            ni_color = [255, 255, 255]  # Default white
-            if data['net_income'] != "N/A":
-                if not data['net_income'].startswith("-"):
-                    ni_color = [0, 255, 0]  # Green for positive
-                else:
-                    ni_color = [255, 0, 0]  # Red for negative
-            
-            dpg.add_text(data['net_income'], color=ni_color)
-            dpg.add_text(data['cash_flow'])
-            
-            # Cache status indicator
-            cache_status = "Fresh" if data['is_cached'] else "Stale"
-            cache_color = [0, 255, 0] if data['is_cached'] else [255, 150, 0]
-            dpg.add_text(cache_status, color=cache_color)
-        
-        print(f"✅ Added {symbol} to table with cached data")
-        
-    except Exception as e:
-        print(f"❌ Failed to add {symbol} to table: {e}")
-        import traceback
-        traceback.print_exc()
 
 # Keep the old function for backward compatibility
 def create_graph_table_page(parent_tag):

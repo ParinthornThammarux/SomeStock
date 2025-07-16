@@ -17,6 +17,7 @@ Pillow>=10.0.0
 
 # Stock Data Source
 stockdex>=1.0.6
+yahooquery>=2.3.7
 
 # Additional utilities
 pathlib2>=2.3.7

@@ -1,4 +1,4 @@
-# utils/stockdx_layer.py - Clean and Organized Version
+# utils/stock_fetch_layer.py - Unified Fetch Version
 
 import dearpygui.dearpygui as dpg
 import time
@@ -7,26 +7,23 @@ import requests
 import pandas as pd
 from utils import constants
 import threading
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
 
 # =============================================================================
 # GLOBAL CONFIGURATION
 # =============================================================================
 
 # Rate limiting configuration
-RATE_LIMIT_DELAY = 8.0  # Increased from 3.0 to 8.0 seconds
-RANDOM_DELAY_MIN = 2.0  # Increased from 0.5 to 2.0
-RANDOM_DELAY_MAX = 4.0  # Increased from 1.5 to 4.0
-MAX_RETRIES = 5         # Increased from 3 to 5
-REQUEST_TIMEOUT = 45    # Increased from 30 to 45 seconds
+RATE_LIMIT_DELAY = 5.0  # Reduced since we're making fewer calls
+RANDOM_DELAY_MIN = 1.0
+RANDOM_DELAY_MAX = 2.0
+MAX_RETRIES = 3
+REQUEST_TIMEOUT = 30
 
 # Global state
 last_request_time = 0
 request_count = 0
 active_fetches = {}  # {symbol: {'stop_flag': threading.Event(), 'result': None}}
-
 
 # =============================================================================
 # MAIN ENTRY POINT
@@ -34,11 +31,14 @@ active_fetches = {}  # {symbol: {'stop_flag': threading.Event(), 'result': None}
 
 def fetch_stock_data(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag):
     """
-    Try all sources simultaneously, stop all others when first one succeeds
+    Unified fetch - gets ALL data from each source in a single call
     """
     print("=" * 80)
-    print(f"🚀 OPTIMIZED FETCHING FOR: {symbol}")
+    print(f"🚀 UNIFIED FETCH FOR: {symbol}")
     print("=" * 80)
+    
+    # Stop any existing fetches for this symbol
+    stop_all_fetches_for_symbol(symbol)
     
     # Create stop flag for this symbol
     stop_flag = threading.Event()
@@ -49,23 +49,14 @@ def fetch_stock_data(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag):
     }
     active_fetches[symbol] = fetch_info
     
-    # Define fetch sources
+    # Define unified fetch sources (priority order)
     sources = [
-        ("Yahoo Finance v8", _fetch_yahoo_v8_with_stop),
-        ("yfinance Library", _fetch_yfinance_with_stop),
-        ("Enhanced Stockdx", _fetch_enhanced_stockdex_with_stop),
+        ("yfinance Complete", _fetch_yfinance_complete),
+        ("yahooquery Complete", _fetch_yahoo_complete),
+        ("stockdx Complete", _fetch_stockdx_complete),
     ]
     
-    # Try Yahoo first (preferred source)
-    yahoo_result = _quick_yahoo_check(symbol, stop_flag)
-    if yahoo_result and yahoo_result != "RATE_LIMITED":
-        print("✅ Yahoo succeeded immediately")
-        _process_result(symbol, yahoo_result, "Yahoo Finance v8", line_tag, x_axis_tag, y_axis_tag, plot_tag)
-        return
-    
-    print("🔄 Yahoo rate limited or failed, trying all sources in parallel...")
-    
-    # Run all sources in parallel threads
+    # Try sources in parallel - first to succeed wins
     with ThreadPoolExecutor(max_workers=3) as executor:
         # Submit all fetch tasks
         future_to_source = {}
@@ -73,11 +64,13 @@ def fetch_stock_data(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag):
             future = executor.submit(fetch_function, symbol, stop_flag)
             future_to_source[future] = source_name
         
+        print(f"🚀 Started {len(sources)} unified fetches for {symbol}")
+        
         # Process results as they come in
         for future in as_completed(future_to_source):
             source_name = future_to_source[future]
             
-            # Check if we should stop (another source already succeeded)
+            # Check if we should stop
             if stop_flag.is_set():
                 print(f"🛑 Stopping {source_name} - another source succeeded")
                 break
@@ -85,14 +78,14 @@ def fetch_stock_data(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag):
             try:
                 result = future.result()
                 
-                if result and result != "RATE_LIMITED" and _validate_data(result):
+                if result and _validate_complete_data(result):
                     print(f"✅ First success: {source_name}")
                     
                     # Signal all other threads to stop
                     stop_flag.set()
                     
-                    # Process the successful result
-                    _process_result(symbol, result, source_name, line_tag, x_axis_tag, y_axis_tag, plot_tag)
+                    # Process the complete result
+                    _process_complete_result(symbol, result, source_name, line_tag, x_axis_tag, y_axis_tag, plot_tag)
                     
                     # Clean up
                     if symbol in active_fetches:
@@ -100,142 +93,55 @@ def fetch_stock_data(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag):
                     return
                     
                 else:
-                    print(f"❌ {source_name} failed or rate limited")
+                    print(f"❌ {source_name} failed or incomplete data")
                     
             except Exception as e:
                 print(f"❌ {source_name} error: {e}")
     
     # If we get here, all sources failed
-    print(f"❌ All sources failed for {symbol}")
+    print(f"❌ All unified sources failed for {symbol}")
     if symbol in active_fetches:
         del active_fetches[symbol]
 
 # =============================================================================
-# DATA SOURCE IMPLEMENTATIONS
+# UNIFIED FETCH FUNCTIONS
 # =============================================================================
 
-# Replace _fetch_yahoo_v8_api function in stockdx_layer.py
-
-def _quick_yahoo_check(symbol, stop_flag):
-    """Quick Yahoo check with immediate rate limit detection"""
-    if stop_flag.is_set():
-        return None
-        
-    url = f"https://query2.finance.yahoo.com/v8/finance/chart/{symbol}"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "application/json",
-    }
-    params = {
-        "period1": int(time.time()) - 86400,
-        "period2": int(time.time()),
-        "interval": "5m",
-        "includePrePost": "false",
-    }
-    
-    try:
-        response = requests.get(url, headers=headers, params=params, timeout=8)
-        
-        if response.status_code == 429:
-            return "RATE_LIMITED"
-        elif response.status_code == 200:
-            return _parse_yahoo_response(response.json())
-        else:
-            return None
-            
-    except Exception:
-        return None
-# Enhanced stockdx_layer.py - Integrated Fundamental Data Fetching
-
-def _fetch_yahoo_v8_with_stop(symbol, stop_flag):
-    """Yahoo v8 fetch with integrated fundamental data"""
-    
-    if stop_flag.is_set():
-        return None
-    
-    # Delay before starting
-    time.sleep(2)
-    
-    if stop_flag.is_set():
-        return None
-    
-    endpoints = [
-        "https://query2.finance.yahoo.com/v8/finance/chart/",
-        "https://query1.finance.yahoo.com/v8/finance/chart/",
-    ]
-    
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "application/json",
-    }
-    
-    # Start with price data
-    price_data = None
-    for endpoint in endpoints:
-        if stop_flag.is_set():
-            return None
-            
-        for attempt in range(2):
-            if stop_flag.is_set():
-                return None
-                
-            try:
-                # Fetch price data
-                url = f"{endpoint}{symbol}"
-                params = {
-                    "period1": int(time.time()) - 86400,
-                    "period2": int(time.time()),
-                    "interval": "5m",
-                    "includePrePost": "false",
-                }
-                
-                response = requests.get(url, headers=headers, params=params, timeout=15)
-                
-                if response.status_code == 200:
-                    price_data = _parse_yahoo_response(response.json())
-                    break
-                elif response.status_code == 429:
-                    for i in range(10):
-                        if stop_flag.is_set():
-                            return None
-                        time.sleep(1)
-                else:
-                    break
-                    
-            except Exception as e:
-                if stop_flag.is_set():
-                    return None
-                continue
-        
-        if price_data:
-            break
-    
-    if not price_data or stop_flag.is_set():
-        return None
-    
-    return price_data
-
-def _fetch_yfinance_with_stop(symbol, stop_flag):
-    """yfinance fetch with integrated fundamental data"""
-    
+def _fetch_yfinance_complete(symbol, stop_flag):
+    """Fetch complete data from yfinance in one call"""
     if stop_flag.is_set():
         return None
     
     try:
+        print(f"📡 yfinance complete fetch for {symbol}")
         import yfinance as yf
         
-        if stop_flag.is_set():
-            return None
-            
         ticker = yf.Ticker(symbol)
         
-        # Fetch price data
+        # Check stop flag
+        if stop_flag.is_set():
+            return None
+        
+        # Get price data
+        print(f"🔄 Getting price history for {symbol}")
         hist = ticker.history(period="1d", interval="5m")
         
         if stop_flag.is_set():
             return None
         
         if hist.empty:
+            print(f"❌ No price history for {symbol}")
+            return None
+        
+        # Get fundamental data
+        print(f"🔄 Getting fundamentals for {symbol}")
+        try:
+            info = ticker.info
+        except Exception as e:
+            print(f"⚠️ Could not get info for {symbol}: {e}")
+            info = {}
+        
+        if stop_flag.is_set():
             return None
         
         # Parse price data
@@ -251,36 +157,306 @@ def _fetch_yfinance_with_stop(symbol, stop_flag):
             'timestamps': [int(ts.timestamp()) for ts in hist.index],
         }
         
-        if stop_flag.is_set():
-            return price_data  # Return what we have
+        # Parse fundamental data
+        fundamentals = {}
+        if info and isinstance(info, dict):
+            # Revenue
+            for revenue_key in ['totalRevenue', 'revenue']:
+                if revenue_key in info and info[revenue_key] and info[revenue_key] != 0:
+                    try:
+                        fundamentals['revenue'] = _format_value(info[revenue_key])
+                        break
+                    except:
+                        continue
+            
+            # Market cap
+            if 'marketCap' in info and info['marketCap'] and info['marketCap'] != 0:
+                try:
+                    fundamentals['market_cap'] = _format_value(info['marketCap'])
+                except:
+                    pass
+            
+            # Net income
+            for ni_key in ['netIncomeToCommon', 'netIncome']:
+                if ni_key in info and info[ni_key] and info[ni_key] != 0:
+                    try:
+                        fundamentals['net_income'] = _format_value(info[ni_key])
+                        break
+                    except:
+                        continue
+            
+            # Cash flow - try multiple keys
+            for cf_key in ['operatingCashflow', 'freeCashflow', 'totalCashFromOperatingActivities', 'operatingCashFlow', 'freeCashFlow']:
+                if cf_key in info and info[cf_key] and info[cf_key] != 0:
+                    try:
+                        fundamentals['cash_flow'] = _format_value(info[cf_key])
+                        break
+                    except:
+                        continue
         
-        return price_data
+        # Combine everything
+        complete_data = {
+            **price_data,  # price, volume, timestamps
+            **fundamentals  # revenue, net_income, etc.
+        }
         
+        print(f"✅ yfinance complete: price + {list(fundamentals.keys())}")
+        return complete_data
+        
+    except ImportError:
+        print(f"❌ yfinance not available")
+        return None
     except Exception as e:
-        print(f"yfinance error: {e}")
+        print(f"❌ yfinance complete error for {symbol}: {e}")
         return None
 
-def _fetch_enhanced_stockdex_with_stop(symbol, stop_flag):
-    """Enhanced stockdx fetch with integrated fundamental data"""
-    
+def _fetch_yahoo_complete(symbol, stop_flag):
+    """Fetch complete data from Yahoo using yahooquery for comprehensive data"""
     if stop_flag.is_set():
         return None
     
     try:
-        from stockdex import Ticker  # Note: using stockdx as specified
+        print(f"📡 yahooquery complete fetch for {symbol}")
+        from yahooquery import Ticker
+        
+        # Create ticker object
+        ticker = Ticker(symbol)
         
         if stop_flag.is_set():
             return None
+        
+        # Get comprehensive data in one call
+        print(f"🔄 Getting comprehensive data for {symbol}")
+        
+        # Get price history
+        hist = ticker.history(period="1d", interval="5m")
+        
+        if stop_flag.is_set():
+            return None
+        
+        if hist.empty:
+            print(f"❌ No price history for {symbol}")
+            return None
+        
+        # Parse price data
+        volume_data = hist['volume'].fillna(0) if 'volume' in hist.columns else []
+        clean_volume = [max(0, int(vol)) for vol in volume_data]
+        
+        price_data = {
+            'close': hist['close'].tolist(),
+            'open': hist['open'].tolist(),
+            'high': hist['high'].tolist(),
+            'low': hist['low'].tolist(),
+            'volume': clean_volume,
+            'timestamps': [int(ts.timestamp()) for ts in hist.index],
+        }
+        
+        if stop_flag.is_set():
+            return price_data
+        
+        # Get comprehensive fundamental data
+        fundamentals = {}
+        
+        try:
+            # Get summary detail (includes key metrics)
+            summary = ticker.summary_detail
+            if summary and not summary.empty:
+                row = summary.iloc[0]
+                
+                # Market cap
+                if 'marketCap' in row and pd.notna(row['marketCap']):
+                    fundamentals['market_cap'] = _format_value(row['marketCap'])
+                
+                # PE ratio
+                if 'trailingPE' in row and pd.notna(row['trailingPE']):
+                    fundamentals['pe_ratio'] = float(row['trailingPE'])
+                
+                # Volume
+                if 'volume' in row and pd.notna(row['volume']):
+                    fundamentals['volume'] = int(row['volume'])
+                
+                # Average volume
+                if 'averageVolume' in row and pd.notna(row['averageVolume']):
+                    fundamentals['avg_volume'] = int(row['averageVolume'])
+        
+        except Exception as e:
+            print(f"⚠️ Could not get summary detail: {e}")
+        
+        if stop_flag.is_set():
+            return {**price_data, **fundamentals}
+        
+        try:
+            # Get financial data
+            financial_data = ticker.financial_data
+            if financial_data and not financial_data.empty:
+                row = financial_data.iloc[0]
+                
+                # Revenue
+                if 'totalRevenue' in row and pd.notna(row['totalRevenue']):
+                    fundamentals['revenue'] = _format_value(row['totalRevenue'])
+                
+                # Operating cash flow
+                if 'operatingCashflow' in row and pd.notna(row['operatingCashflow']):
+                    fundamentals['cash_flow'] = _format_value(row['operatingCashflow'])
+                
+                # Free cash flow
+                if 'freeCashflow' in row and pd.notna(row['freeCashflow']):
+                    fundamentals['free_cash_flow'] = _format_value(row['freeCashflow'])
+        
+        except Exception as e:
+            print(f"⚠️ Could not get financial data: {e}")
+        
+        if stop_flag.is_set():
+            return {**price_data, **fundamentals}
+        
+        try:
+            # Get income statement for net income
+            income_stmt = ticker.income_statement(frequency='quarterly')
+            if income_stmt and not income_stmt.empty:
+                # Get most recent quarter
+                latest_data = income_stmt.iloc[0]
+                
+                # Net income
+                if 'NetIncome' in latest_data and pd.notna(latest_data['NetIncome']):
+                    fundamentals['net_income'] = _format_value(latest_data['NetIncome'])
+                elif 'NetIncomeCommonStockholders' in latest_data and pd.notna(latest_data['NetIncomeCommonStockholders']):
+                    fundamentals['net_income'] = _format_value(latest_data['NetIncomeCommonStockholders'])
+        
+        except Exception as e:
+            print(f"⚠️ Could not get income statement: {e}")
+        
+        if stop_flag.is_set():
+            return {**price_data, **fundamentals}
+        
+        try:
+            # Get company profile for additional info
+            profile = ticker.asset_profile
+            if profile and not profile.empty:
+                row = profile.iloc[0]
+                
+                # Company name
+                if 'longName' in row and pd.notna(row['longName']):
+                    fundamentals['company_name'] = str(row['longName'])
+                
+                # Industry
+                if 'industry' in row and pd.notna(row['industry']):
+                    fundamentals['industry'] = str(row['industry'])
+                
+                # Sector
+                if 'sector' in row and pd.notna(row['sector']):
+                    fundamentals['sector'] = str(row['sector'])
+        
+        except Exception as e:
+            print(f"⚠️ Could not get asset profile: {e}")
+        
+        # Combine everything
+        complete_data = {
+            **price_data,
+            **fundamentals
+        }
+        
+        fund_keys = [k for k, v in fundamentals.items() if v is not None]
+        print(f"✅ yahooquery complete: price + fundamentals: {fund_keys}")
+        return complete_data
+        
+    except ImportError:
+        print(f"❌ yahooquery not available")
+    except Exception as e:
+        print(f"❌ yahooquery error for {symbol}: {e}")
+        return None
+
+def _parse_yahoo_comprehensive_fundamentals(data):
+    """Parse comprehensive Yahoo fundamentals response"""
+    try:
+        fundamentals = {}
+        
+        if 'quoteSummary' in data and data['quoteSummary']['result']:
+            result = data['quoteSummary']['result'][0]
             
+            # Financial data
+            if 'financialData' in result and result['financialData']:
+                fd = result['financialData']
+                
+                if 'totalRevenue' in fd and fd['totalRevenue']:
+                    fundamentals['revenue'] = _format_yahoo_value(fd['totalRevenue'])
+                
+                if 'operatingCashflow' in fd and fd['operatingCashflow']:
+                    fundamentals['cash_flow'] = _format_yahoo_value(fd['operatingCashflow'])
+                
+                if 'freeCashflow' in fd and fd['freeCashflow']:
+                    fundamentals['free_cash_flow'] = _format_yahoo_value(fd['freeCashflow'])
+            
+            # Summary detail
+            if 'summaryDetail' in result and result['summaryDetail']:
+                sd = result['summaryDetail']
+                
+                if 'marketCap' in sd and sd['marketCap']:
+                    fundamentals['market_cap'] = _format_yahoo_value(sd['marketCap'])
+                
+                if 'trailingPE' in sd and sd['trailingPE']:
+                    fundamentals['pe_ratio'] = sd['trailingPE'].get('raw') if isinstance(sd['trailingPE'], dict) else sd['trailingPE']
+                
+                if 'volume' in sd and sd['volume']:
+                    fundamentals['volume'] = sd['volume'].get('raw') if isinstance(sd['volume'], dict) else sd['volume']
+                
+                if 'averageVolume' in sd and sd['averageVolume']:
+                    fundamentals['avg_volume'] = sd['averageVolume'].get('raw') if isinstance(sd['averageVolume'], dict) else sd['averageVolume']
+            
+            # Asset profile
+            if 'assetProfile' in result and result['assetProfile']:
+                ap = result['assetProfile']
+                
+                if 'longName' in ap and ap['longName']:
+                    fundamentals['company_name'] = ap['longName']
+                
+                if 'industry' in ap and ap['industry']:
+                    fundamentals['industry'] = ap['industry']
+                
+                if 'sector' in ap and ap['sector']:
+                    fundamentals['sector'] = ap['sector']
+            
+            # Income statement history
+            if 'incomeStatementHistory' in result and result['incomeStatementHistory']:
+                try:
+                    income_history = result['incomeStatementHistory']['incomeStatementHistory']
+                    if income_history and len(income_history) > 0:
+                        latest_income = income_history[0]  # Most recent
+                        
+                        if 'netIncome' in latest_income and latest_income['netIncome']:
+                            fundamentals['net_income'] = _format_yahoo_value(latest_income['netIncome'])
+                        elif 'netIncomeToCommon' in latest_income and latest_income['netIncomeToCommon']:
+                            fundamentals['net_income'] = _format_yahoo_value(latest_income['netIncomeToCommon'])
+                except Exception:
+                    pass
+        
+        return fundamentals
+        
+    except Exception as e:
+        print(f"❌ Error parsing comprehensive Yahoo fundamentals: {e}")
+        return {}
+def _fetch_stockdx_complete(symbol, stop_flag):
+    """Fetch complete data from stockdx in one call"""
+    if stop_flag.is_set():
+        return None
+    
+    try:
+        print(f"📡 stockdx complete fetch for {symbol}")
+        from stockdex import Ticker
+        
         ticker = Ticker(ticker=symbol)
         
-        # Fetch price data
+        if stop_flag.is_set():
+            return None
+        
+        # Get price data
+        print(f"🔄 Getting stockdx price data for {symbol}")
         df = ticker.yahoo_api_price(range='1d', dataGranularity='5m')
         
         if stop_flag.is_set():
             return None
         
         if df is None or df.empty:
+            print(f"❌ No stockdx price data for {symbol}")
             return None
         
         # Parse price data
@@ -295,295 +471,100 @@ def _fetch_enhanced_stockdex_with_stop(symbol, stop_flag):
             'volume': clean_volume,
         }
         
+        # Get fundamental data
+        fundamentals = {}
+        
         if stop_flag.is_set():
-            return price_data
+            return price_data  # Return at least price data
         
-        return price_data
-        
-    except Exception as e:
-        print(f"stockdx error: {e}")
-        return None
-
-def _fetch_fundamentals_parallel(symbol, price_df):
-    """Fetch fundamentals from multiple sources in parallel with rate limit handling"""
-    
-    # Create stop flag for this symbol's fundamental fetching
-    stop_flag = threading.Event()
-    
-    # Define fundamental sources
-    fundamental_sources = [
-        ("Yahoo Fundamentals", _fetch_yahoo_fundamentals_standalone),
-        ("yfinance Fundamentals", _fetch_yfinance_fundamentals_standalone),
-        ("stockdex Fundamentals", _fetch_stockdx_fundamentals_standalone),
-    ]
-    
-    def fetch_with_rate_limit_handling():
-        """Try sources sequentially, then in background if rate limited"""
-        results = {}
-        background_futures = []
-        
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            
-            # Phase 1: Try each source sequentially first
-            for source_name, fetch_function in fundamental_sources:
-                if stop_flag.is_set():
-                    break
-                    
-                print(f"🔄 Trying {source_name} for {symbol}")
-                
-                try:
-                    # Quick attempt with short timeout
-                    future = executor.submit(fetch_function, symbol, stop_flag, timeout=5)
-                    result = future.result(timeout=8)  # 8 second total timeout
-                    
-                    if result and result != "RATE_LIMITED":
-                        print(f"✅ {source_name} succeeded immediately")
-                        results[source_name] = result
-                        stop_flag.set()  # Stop all others
-                        break
-                    elif result == "RATE_LIMITED":
-                        print(f"⏳ {source_name} rate limited, moving to background")
-                        # Submit to background with longer timeout
-                        bg_future = executor.submit(fetch_function, symbol, stop_flag, timeout=30)
-                        background_futures.append((source_name, bg_future))
-                    
-                except Exception as e:
-                    print(f"❌ {source_name} failed: {e}")
-                    continue
-            
-            # Phase 2: Wait for background futures if no immediate success
-            if not stop_flag.is_set() and background_futures:
-                print(f"⏳ Waiting for {len(background_futures)} background fundamental sources...")
-                
-                for source_name, future in as_completed([f for _, f in background_futures]):
-                    if stop_flag.is_set():
-                        break
-                        
-                    try:
-                        result = future.result()
-                        if result and result != "RATE_LIMITED":
-                            # Find the source name
-                            source_name = next(name for name, f in background_futures if f == future)
-                            print(f"✅ Background {source_name} succeeded")
-                            results[source_name] = result
-                            stop_flag.set()  # Stop all others
-                            break
-                    except Exception as e:
-                        print(f"❌ Background fundamental source failed: {e}")
-        
-        return results
-    
-    # Run the fetching in a separate thread to not block the main UI
-    def update_cache_with_fundamentals():
         try:
-            results = fetch_with_rate_limit_handling()
+            print(f"🔄 Getting stockdx income statement for {symbol}")
+            # Try income statement
+            income_statement = None
+            try:
+                income_statement = ticker.yahoo_api_income_statement(frequency='quarterly', format='raw')
+            except:
+                try:
+                    income_statement = ticker.yahoo_api_income_statement(frequency='annual', format='raw')
+                except:
+                    pass
             
-            if results:
-                # Use the first successful result
-                source_name, fundamental_data = next(iter(results.items()))
-                print(f"🎯 Using fundamental data from {source_name}")
-                
-                # Update cache with fundamental data
-                _cache_comprehensive_data(symbol, price_df, fundamental_data)
-                
-                # Update UI table
-                _add_to_portfolio_table(symbol)
-                
-                print(f"✅ Fundamental data cached for {symbol}")
-            else:
-                print(f"❌ No fundamental data available for {symbol}")
+            if income_statement is not None and not income_statement.empty:
+                _extract_revenue_from_statement(income_statement, fundamentals)
+                _extract_net_income_from_statement(income_statement, fundamentals)
+            
+            if stop_flag.is_set():
+                return {**price_data, **fundamentals}
+            
+            print(f"🔄 Getting stockdx cash flow for {symbol}")
+            # Try cash flow
+            cash_flow = None
+            try:
+                cash_flow = ticker.yahoo_api_cash_flow(frequency='quarterly', format='raw')
+            except:
+                try:
+                    cash_flow = ticker.yahoo_api_cash_flow(frequency='annual', format='raw')
+                except:
+                    pass
+            
+            if cash_flow is not None and not cash_flow.empty:
+                _extract_cash_flow_from_statement(cash_flow, fundamentals)
                 
         except Exception as e:
-            print(f"❌ Error in parallel fundamental fetch: {e}")
-    
-    # Start in background thread
-    threading.Thread(target=update_cache_with_fundamentals, daemon=True).start()
-
-def _fetch_yahoo_fundamentals_standalone(symbol, stop_flag, timeout=10):
-    """Standalone Yahoo fundamentals fetch"""
-    if stop_flag.is_set():
-        return None
-    
-    try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "application/json",
+            print(f"⚠️ stockdx fundamentals error for {symbol}: {e}")
+        
+        # Combine everything
+        complete_data = {
+            **price_data,
+            **fundamentals
         }
         
-        url = f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{symbol}"
-        params = {
-            "modules": "financialData,defaultKeyStatistics,incomeStatementHistory,cashflowStatementHistory"
-        }
+        print(f"✅ stockdx complete: price + {list(fundamentals.keys())}")
+        return complete_data
         
-        response = requests.get(url, headers=headers, params=params, timeout=timeout)
-        
-        if response.status_code == 429:
-            return "RATE_LIMITED"
-        elif response.status_code == 200:
-            return _parse_yahoo_fundamentals(response.json())
-        else:
-            return None
-            
+    except ImportError:
+        print(f"❌ stockdx not available")
+        return None
     except Exception as e:
-        print(f"Yahoo fundamentals standalone error: {e}")
+        print(f"❌ stockdx complete error for {symbol}: {e}")
         return None
 
-def _fetch_yfinance_fundamentals_standalone(symbol, stop_flag, timeout=10):
-    """Standalone yfinance fundamentals fetch"""
-    if stop_flag.is_set():
-        return None
+# =============================================================================
+# PROCESSING AND CACHING
+# =============================================================================
+
+def _process_complete_result(symbol, data, source_name, line_tag, x_axis_tag, y_axis_tag, plot_tag):
+    """Process complete result with both price and fundamental data"""
+    print(f"🎯 Processing complete result from {source_name} for {symbol}")
     
-    try:
-        import yfinance as yf
-        
-        ticker = yf.Ticker(symbol)
-        
-        # Quick info fetch
-        info = ticker.info
-        fundamental_data = {}
-        
-        if info:
-            if 'totalRevenue' in info:
-                fundamental_data['revenue'] = _format_value(info['totalRevenue'])
-            if 'marketCap' in info:
-                fundamental_data['market_cap'] = _format_value(info['marketCap'])
-            if 'netIncomeToCommon' in info:
-                fundamental_data['net_income'] = _format_value(info['netIncomeToCommon'])
-        
-        return fundamental_data if fundamental_data else None
-        
-    except Exception as e:
-        print(f"yfinance fundamentals standalone error: {e}")
-        return None
-
-def _fetch_stockdx_fundamentals_standalone(symbol, stop_flag, timeout=10):
-    """Standalone stockdex fundamentals fetch"""
-    if stop_flag.is_set():
-        return None
+    # 1. Update chart immediately with price data
+    _update_chart_with_data(data, line_tag, x_axis_tag, y_axis_tag, plot_tag)
     
-    try:
-        from stockdex import Ticker
-        
-        ticker = Ticker(ticker=symbol)
-        fundamental_data = {}
-        
-        # Try income statement
-        try:
-            income_statement = ticker.yahoo_api_income_statement(frequency='quarterly', format='raw')
-            if income_statement is not None and not income_statement.empty:
-                _extract_revenue_standalone(income_statement, fundamental_data)
-                _extract_net_income_standalone(income_statement, fundamental_data)
-        except Exception:
-            pass
-        
-        if stop_flag.is_set():
-            return fundamental_data if fundamental_data else None
-        
-        # Try cash flow
-        try:
-            cash_flow = ticker.yahoo_api_cash_flow(frequency='quarterly', format='raw')
-            if cash_flow is not None and not cash_flow.empty:
-                _extract_cash_flow_standalone(cash_flow, fundamental_data)
-        except Exception:
-            pass
-        
-        return fundamental_data if fundamental_data else None
-        
-    except Exception as e:
-        print(f"stockdex fundamentals standalone error: {e}")
-        return None
-
-def _parse_yahoo_fundamentals(data):
-    """Parse Yahoo fundamentals response"""
-    try:
-        if 'quoteSummary' in data and data['quoteSummary']['result']:
-            result = data['quoteSummary']['result'][0]
-            fundamental_data = {}
-            
-            if 'financialData' in result:
-                fd = result['financialData']
-                if 'totalRevenue' in fd:
-                    fundamental_data['revenue'] = _format_yahoo_value(fd['totalRevenue'])
-                if 'marketCap' in fd:
-                    fundamental_data['market_cap'] = _format_yahoo_value(fd['marketCap'])
-            
-            return fundamental_data if fundamental_data else None
-    except Exception:
-        return None
-
-def _extract_revenue_standalone(income_statement, fundamental_data):
-    """Extract revenue for standalone fetch"""
-    try:
-        if 'quarterlyTotalRevenue' in income_statement.columns:
-            latest_idx = income_statement.index[-1]
-            rev_value = income_statement.loc[latest_idx, 'quarterlyTotalRevenue']
-            if pd.notna(rev_value) and rev_value != 0:
-                fundamental_data['revenue'] = _format_value(float(rev_value))
-    except Exception:
-        pass
-
-def _extract_net_income_standalone(income_statement, fundamental_data):
-    """Extract net income for standalone fetch"""
-    try:
-        for col in ['quarterlyNetIncome', 'quarterlyNetIncomeCommonStockholders']:
-            if col in income_statement.columns:
-                latest_idx = income_statement.index[-1]
-                ni_value = income_statement.loc[latest_idx, col]
-                if pd.notna(ni_value) and ni_value != 0:
-                    fundamental_data['net_income'] = _format_value(float(ni_value))
-                break
-    except Exception:
-        pass
-
-def _extract_cash_flow_standalone(cash_flow, fundamental_data):
-    """Extract cash flow for standalone fetch"""
-    try:
-        for col in ['quarterlyOperatingCashFlow', 'quarterlyFreeCashFlow']:
-            if col in cash_flow.columns:
-                latest_idx = cash_flow.index[-1]
-                cf_value = cash_flow.loc[latest_idx, col]
-                if pd.notna(cf_value) and cf_value != 0:
-                    fundamental_data['cash_flow'] = _format_value(float(cf_value))
-                break
-    except Exception:
-        pass
+    # 2. Convert to DataFrame for caching
+    df = _convert_price_to_dataframe(data)
     
-def _format_yahoo_value(value_dict):
-    """Format Yahoo API value dictionary"""
-    if not value_dict or 'raw' not in value_dict:
-        return None
+    # 3. Extract fundamentals
+    fundamentals = _extract_fundamentals_from_data(data)
     
-    return _format_value(value_dict['raw'])
-
-def _format_value(value):
-    """Format numerical value to readable string"""
-    if value is None or value == 0:
-        return None
+    # 4. Cache everything at once
+    _cache_complete_data(symbol, df, fundamentals)
     
-    try:
-        value = float(value)
-        if abs(value) >= 1_000_000_000:
-            return f"${value/1_000_000_000:.1f}B"
-        elif abs(value) >= 1_000_000:
-            return f"${value/1_000_000:.1f}M"
-        elif abs(value) >= 1_000:
-            return f"${value/1_000:.1f}K"
-        else:
-            return f"${value:.0f}"
-    except (ValueError, TypeError):
-        return None
+    # 5. Add to table with complete data
+    _add_to_portfolio_table_direct(symbol)
+    
+    # 6. Update request tracking
+    global last_request_time
+    last_request_time = time.time()
+    
+    print(f"✅ Complete processing finished for {symbol} from {source_name}")
 
-# Updated cache processing function
-def _cache_comprehensive_data(symbol, price_df, additional_data=None):
-    """Enhanced cache function that handles integrated fundamental data"""
+def _cache_complete_data(symbol, price_df, fundamentals):
+    """Cache complete data (price + fundamentals) in one operation"""
     try:
         from components.stock.stock_data_manager import stock_data_cache, StockData
         
-        # Get or create stock data object
-        if symbol in stock_data_cache:
-            stock_data = stock_data_cache[symbol]
-        else:
-            stock_data = StockData(symbol=symbol, company_name=f"{symbol} Corp.")
+        # Create comprehensive stock data object
+        stock_data = StockData(symbol=symbol, company_name=fundamentals.get('company_name', f"{symbol} Corp."))
         
         # Update price data
         stock_data.last_updated = time.time()
@@ -603,47 +584,99 @@ def _cache_comprehensive_data(symbol, price_df, additional_data=None):
         # Extract volume
         _extract_volume_from_cache(price_df, stock_data)
         
-        # Use integrated fundamental data if available (rarely will be)
-        if additional_data:
-            if 'revenue' in additional_data and additional_data['revenue']:
-                stock_data.revenue = additional_data['revenue']
-            
-            if 'net_income' in additional_data and additional_data['net_income']:
-                stock_data.net_income = additional_data['net_income']
-            
-            if 'cash_flow' in additional_data and additional_data['cash_flow']:
-                stock_data.cash_flow = additional_data['cash_flow']
-            
-            if 'market_cap' in additional_data and additional_data['market_cap']:
-                stock_data.market_cap = additional_data['market_cap']
-            
-            print(f"✅ Used integrated fundamental data for {symbol}")
-        else:
-            # This is the normal case - no integrated fundamentals
-            print(f"📊 Price data cached for {symbol}, fundamentals will be fetched separately")
+        # Update fundamental data
+        if 'revenue' in fundamentals and fundamentals['revenue']:
+            stock_data.revenue = fundamentals['revenue']
         
-        # Update cache and UI
+        if 'net_income' in fundamentals and fundamentals['net_income']:
+            stock_data.net_income = fundamentals['net_income']
+        
+        if 'cash_flow' in fundamentals and fundamentals['cash_flow']:
+            stock_data.cash_flow = fundamentals['cash_flow']
+        
+        if 'market_cap' in fundamentals and fundamentals['market_cap']:
+            stock_data.market_cap = fundamentals['market_cap']
+        
+        # Update cache
         stock_data_cache[symbol] = stock_data
-        _update_stock_tag_cache(symbol, stock_data)
-        _add_to_portfolio_table(symbol)
         
-        print(f"✅ Comprehensive data cached for {symbol}")
+        # Update stock tag if it exists
+        _update_stock_tag_cache(symbol, stock_data)
+        
+        fund_summary = [k for k, v in fundamentals.items() if v] or ['none']
+        print(f"✅ Complete data cached for {symbol}: price + fundamentals: {fund_summary}")
         
     except Exception as e:
-        print(f"❌ Error caching data: {e}")
+        print(f"❌ Error caching complete data: {e}")
+
+def _add_to_portfolio_table_direct(symbol):
+    """Add stock to portfolio table using the fixed direct method"""
+    try:
+        print(f"📋 Adding {symbol} to portfolio table with complete data")
         
-# Updated data conversion function
-def _convert_to_dataframe(data):
-    """Convert API data to DataFrame and extract additional data"""
+        # Import the internal function directly (bypasses lock issues)
+        from components.graph.graph_dpg import _add_stock_to_table_internal, current_table_tag
+        
+        # Check if table exists
+        if not current_table_tag or not dpg.does_item_exist(current_table_tag):
+            print(f"❌ Portfolio table not available for {symbol}")
+            return
+        
+        # Check if symbol already exists
+        from components.graph.graph_dpg import symbol_exists_in_table
+        if symbol_exists_in_table(symbol):
+            print(f"📋 {symbol} already exists in table, skipping")
+            return
+        
+        # Add directly
+        _add_stock_to_table_internal(symbol)
+        print(f"✅ Added {symbol} to table with complete data")
+        
+    except Exception as e:
+        print(f"❌ Error adding {symbol} to table: {e}")
+
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+
+def _validate_complete_data(data):
+    """Validate that we have usable complete data"""
+    if not data or data == "RATE_LIMITED":
+        return False
+    
+    # Must have price data
+    close_prices = data.get('close', [])
+    if not close_prices:
+        return False
+    
+    # Check for valid prices
+    valid_prices = [p for p in close_prices if p is not None and p > 0]
+    if len(valid_prices) == 0:
+        return False
+    
+    # Don't require fundamentals - nice to have but not mandatory
+    return True
+
+def _extract_fundamentals_from_data(data):
+    """Extract fundamental data from complete response"""
+    fundamentals = {}
+    
+    fundamental_keys = ['revenue', 'net_income', 'cash_flow', 'market_cap', 'company_name']
+    for key in fundamental_keys:
+        if key in data and data[key]:
+            fundamentals[key] = data[key]
+    
+    return fundamentals
+
+def _convert_price_to_dataframe(data):
+    """Convert price data to DataFrame"""
     try:
         df_data = {}
-        additional_data = {}
-        
-        # Find max length for price data
-        price_keys = ['open', 'high', 'low', 'close', 'volume']
-        max_length = max(len(data.get(key, [])) for key in price_keys)
         
         # Process price data
+        price_keys = ['open', 'high', 'low', 'close', 'volume']
+        max_length = max(len(data.get(key, [])) for key in price_keys if key in data)
+        
         for key in price_keys:
             values = data.get(key, [])
             while len(values) < max_length:
@@ -659,20 +692,14 @@ def _convert_to_dataframe(data):
             except Exception:
                 pass
         
-        # Extract additional fundamental data
-        fundamental_keys = ['revenue', 'net_income', 'cash_flow', 'market_cap']
-        for key in fundamental_keys:
-            if key in data and data[key]:
-                additional_data[key] = data[key]
-        
-        return df, additional_data
+        return df
         
     except Exception as e:
-        print(f"❌ Error converting to DataFrame: {e}")
-        return pd.DataFrame({'close': data.get('close', [])}), {}
+        print(f"❌ Error converting price to DataFrame: {e}")
+        return pd.DataFrame({'close': data.get('close', [])})
 
-def _parse_yahoo_response(data):
-    """Parse Yahoo API response"""
+def _parse_yahoo_price_response(data):
+    """Parse Yahoo price API response"""
     try:
         chart = data['chart']['result'][0]
         quotes = chart['indicators']['quote'][0]
@@ -689,44 +716,102 @@ def _parse_yahoo_response(data):
             'close': quotes.get('close', []),
             'volume': clean_volume,
         }
-    except Exception:
+    except Exception as e:
+        print(f"❌ Error parsing Yahoo price response: {e}")
         return None
 
-def _process_result(symbol, data, source_name, line_tag, x_axis_tag, y_axis_tag, plot_tag):
-    """Process the successful result and fetch fundamentals in parallel"""
-    print(f"🎯 Processing result from {source_name} for {symbol}")
-    
-    # 1. Update chart immediately with price data
-    _update_chart_with_data(data, line_tag, x_axis_tag, y_axis_tag, plot_tag)
-    
-    # 2. Convert to DataFrame for caching
-    df, existing_fundamentals = _convert_to_dataframe(data)
-    
-    # 3. Cache price data immediately
-    _cache_comprehensive_data(symbol, df)
-    
-    # 4. Start parallel fundamental fetching if no integrated fundamentals
-    if not existing_fundamentals:
-        print(f"🔄 Starting parallel fundamental fetch for {symbol}")
-        _fetch_fundamentals_parallel(symbol, df)
-    else:
-        print(f"✅ Using integrated fundamentals for {symbol}")
-    
-    # 5. Update request tracking
-    global last_request_time
-    last_request_time = time.time()
-    
-    print(f"✅ Completed processing {symbol} from {source_name}")
+def _parse_yahoo_fundamentals(data):
+    """Parse Yahoo fundamentals response"""
+    try:
+        fundamentals = {}
+        
+        if 'quoteSummary' in data and data['quoteSummary']['result']:
+            result = data['quoteSummary']['result'][0]
+            
+            if 'financialData' in result:
+                fd = result['financialData']
+                if 'totalRevenue' in fd and fd['totalRevenue']:
+                    fundamentals['revenue'] = _format_yahoo_value(fd['totalRevenue'])
+                if 'marketCap' in fd and fd['marketCap']:
+                    fundamentals['market_cap'] = _format_yahoo_value(fd['marketCap'])
+            
+            # Try to get cash flow from cash flow statement
+            if 'cashflowStatementHistory' in result:
+                try:
+                    cf_history = result['cashflowStatementHistory']['cashflowStatements']
+                    if cf_history and len(cf_history) > 0:
+                        latest_cf = cf_history[0]  # Most recent
+                        if 'totalCashFromOperatingActivities' in latest_cf:
+                            fundamentals['cash_flow'] = _format_yahoo_value(latest_cf['totalCashFromOperatingActivities'])
+                except:
+                    pass
+        
+        return fundamentals
+        
+    except Exception as e:
+        print(f"❌ Error parsing Yahoo fundamentals: {e}")
+        return {}
 
-def stop_all_fetches_for_symbol(symbol):
-    """Stop all active fetches for a symbol (e.g., when user switches stocks)"""
-    if symbol in active_fetches:
-        active_fetches[symbol]['stop_flag'].set()
-        print(f"🛑 Stopped all fetches for {symbol}")
+def _extract_revenue_from_statement(income_statement, fundamentals):
+    """Extract revenue from income statement"""
+    try:
+        if 'quarterlyTotalRevenue' in income_statement.columns:
+            latest_idx = income_statement.index[-1]
+            rev_value = income_statement.loc[latest_idx, 'quarterlyTotalRevenue']
+            if pd.notna(rev_value) and rev_value != 0:
+                fundamentals['revenue'] = _format_value(float(rev_value))
+    except Exception:
+        pass
 
-# =============================================================================
-# CHART AND CACHE PROCESSING
-# =============================================================================
+def _extract_net_income_from_statement(income_statement, fundamentals):
+    """Extract net income from income statement"""
+    try:
+        for col in ['quarterlyNetIncome', 'quarterlyNetIncomeCommonStockholders']:
+            if col in income_statement.columns:
+                latest_idx = income_statement.index[-1]
+                ni_value = income_statement.loc[latest_idx, col]
+                if pd.notna(ni_value) and ni_value != 0:
+                    fundamentals['net_income'] = _format_value(float(ni_value))
+                break
+    except Exception:
+        pass
+
+def _extract_cash_flow_from_statement(cash_flow, fundamentals):
+    """Extract cash flow from cash flow statement"""
+    try:
+        for col in ['quarterlyOperatingCashFlow', 'quarterlyFreeCashFlow']:
+            if col in cash_flow.columns:
+                latest_idx = cash_flow.index[-1]
+                cf_value = cash_flow.loc[latest_idx, col]
+                if pd.notna(cf_value) and cf_value != 0:
+                    fundamentals['cash_flow'] = _format_value(float(cf_value))
+                break
+    except Exception:
+        pass
+
+def _format_yahoo_value(value_dict):
+    """Format Yahoo API value dictionary"""
+    if not value_dict or 'raw' not in value_dict:
+        return None
+    return _format_value(value_dict['raw'])
+
+def _format_value(value):
+    """Format numerical value to readable string"""
+    if value is None or value == 0:
+        return None
+    
+    try:
+        value = float(value)
+        if abs(value) >= 1_000_000_000:
+            return f"${value/1_000_000_000:.1f}B"
+        elif abs(value) >= 1_000_000:
+            return f"${value/1_000_000:.1f}M"
+        elif abs(value) >= 1_000:
+            return f"${value/1_000:.1f}K"
+        else:
+            return f"${value:.0f}"
+    except (ValueError, TypeError):
+        return None
 
 def _update_chart_with_data(data, line_tag, x_axis_tag, y_axis_tag, plot_tag):
     """Update DPG chart with fetched data"""
@@ -768,105 +853,9 @@ def _update_chart_with_data(data, line_tag, x_axis_tag, y_axis_tag, plot_tag):
         
     except Exception as e:
         print(f"❌ Error updating chart: {e}")
-        
-# =============================================================================
-# UTILITY FUNCTIONS
-# =============================================================================
-
-def _apply_rate_limiting():
-    """Apply enhanced rate limiting to prevent API abuse"""
-    global last_request_time, request_count
-    
-    current_time = time.time()
-    time_since_last = current_time - last_request_time
-    
-    # Adaptive delay based on request count
-    if request_count > 15:
-        base_delay = 15.0  # Much longer delay after many requests
-    elif request_count > 10:
-        base_delay = 12.0
-    elif request_count > 5:
-        base_delay = 10.0
-    else:
-        base_delay = RATE_LIMIT_DELAY
-    
-    if time_since_last < base_delay:
-        sleep_time = base_delay - time_since_last
-        print(f"⏱️ Rate limiting: waiting {sleep_time:.2f} seconds...")
-        time.sleep(sleep_time)
-    
-    # Add random delay to avoid pattern detection
-    random_delay = random.uniform(RANDOM_DELAY_MIN, RANDOM_DELAY_MAX)
-    print(f"⏱️ Random delay: {random_delay:.2f} seconds...")
-    time.sleep(random_delay)
-    
-    # Update counters
-    last_request_time = time.time()
-    request_count += 1
-    
-    # Reset counter periodically
-    if request_count > 20:
-        print("🔄 Resetting request counter and taking longer break...")
-        time.sleep(30)  # Take a 30-second break
-        request_count = 0
-
-def reset_rate_limiting():
-    """Reset rate limiting counters - call this when switching symbols"""
-    global last_request_time, request_count
-    request_count = 0
-    last_request_time = 0
-    print("🔄 Rate limiting counters reset")
-    
-def _validate_data(data):
-    """Validate that fetched data is usable"""
-    if not data:
-        return False
-    
-    close_prices = data.get('close', [])
-    if not close_prices:
-        return False
-    
-    # Check for valid prices (not all None)
-    valid_prices = [p for p in close_prices if p is not None and p > 0]
-    return len(valid_prices) > 0
-
-def _improved_get_response(self, url):
-    """Improved get_response method for stockdx with better error handling"""
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://finance.yahoo.com/",
-        "Connection": "keep-alive",
-        "DNT": "1",
-    }
-    
-    session = requests.Session()
-    
-    for attempt in range(MAX_RETRIES):
-        try:
-            response = session.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
-            
-            if response.status_code == 200:
-                return response
-            elif response.status_code == 429:
-                wait_time = (2 ** attempt) * 10  # Exponential backoff
-                print(f"Rate limited. Waiting {wait_time}s (attempt {attempt + 1}/{MAX_RETRIES})")
-                time.sleep(wait_time)
-            else:
-                print(f"HTTP {response.status_code}: {response.reason}")
-                if attempt < MAX_RETRIES - 1:
-                    time.sleep(5)
-                    
-        except requests.exceptions.RequestException as e:
-            print(f"Request error (attempt {attempt + 1}/{MAX_RETRIES}): {e}")
-            if attempt < MAX_RETRIES - 1:
-                time.sleep(2 ** attempt)
-    
-    raise Exception(f"Failed to fetch {url} after {MAX_RETRIES} attempts")
 
 def _extract_volume_from_cache(price_df, stock_data):
-    """Extract volume from DataFrame - already cleaned by API functions"""
+    """Extract volume from DataFrame"""
     try:
         if 'volume' not in price_df.columns:
             return
@@ -881,32 +870,42 @@ def _extract_volume_from_cache(price_df, stock_data):
                 
     except Exception as e:
         print(f"⚠️ Could not extract volume: {e}")
-        
+
 def _update_stock_tag_cache(symbol, stock_data):
     """Update stock tag with fresh cache data"""
     try:
-        from components.stock.stock_data_manager import find_tag_by_name
+        from components.stock.stock_data_manager import find_tag_by_symbol
         
-        tag = find_tag_by_name(symbol)
+        tag = find_tag_by_symbol(symbol)
         if tag:
             tag.stock_data = stock_data
             tag.update_cache_indicator()
     except Exception as e:
         print(f"⚠️ Could not update stock tag cache: {e}")
 
-def _add_to_portfolio_table(symbol):
-    """Add stock to portfolio table"""
+def stop_all_fetches_for_symbol(symbol):
+    """Stop all active fetches for a symbol"""
     try:
-        from components.graph.graph_dpg import add_stock_to_portfolio_table
-        add_stock_to_portfolio_table(symbol)
+        if symbol in active_fetches:
+            active_fetches[symbol]['stop_flag'].set()
+            print(f"🛑 Stopped fetch for {symbol}")
+        
+        if symbol in active_fetches:
+            del active_fetches[symbol]
+        
+        print(f"🧹 Cleaned up fetch for {symbol}")
+        
     except Exception as e:
-        print(f"⚠️ Could not add to portfolio table: {e}")
+        print(f"❌ Error stopping fetches for {symbol}: {e}")
 
-# =============================================================================
-# LEGACY COMPATIBILITY
-# =============================================================================
+# Legacy compatibility
+def reset_rate_limiting():
+    """Reset rate limiting counters"""
+    global last_request_time, request_count
+    request_count = 0
+    last_request_time = 0
+    print("🔄 Rate limiting counters reset")
 
-# Keep original function names for backward compatibility
 def update_chart(df, line_tag, x_axis_tag, y_axis_tag, plot_tag):
     """Legacy function - converts DataFrame to data dict and updates chart"""
     try:
