@@ -116,7 +116,7 @@ def load_scaler(symbol):
     if os.path.exists(path):
         max_val = np.load(path)
         scaler = MinMaxScaler()
-        scaler.fit(np.array([[0], [max_val]]))
+        scaler.fit(np.array([[0], [max_val.item()]]))
         return scaler
     return None
 
