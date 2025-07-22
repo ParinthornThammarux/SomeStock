@@ -1,29 +1,30 @@
 import json
 import os
 
-FAVORITE_FILE = 'favorite_stocks.json'
-def loadfave():
-    if not os.path.exists(FAVORITE_FILE):
+def loadfave(filepath):
+    if not filepath or not os.path.exists(filepath):
         return []
-    with open(FAVORITE_FILE, 'r') as f:
+    with open(filepath, 'r', encoding='utf-8') as f:
         try:
             return json.load(f)
         except json.JSONDecodeError:
             return []
 
-def savefave(favorites):
+def savefave(favorites, filepath):
+    if not filepath:
+        return
     favorites.sort()
-    with open(FAVORITE_FILE, 'w') as f:
-        json.dump(favorites, f)
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(favorites, f, ensure_ascii=False, indent=2)
 
-def addfav(name):
-    current = loadfave()
-    if name not in current:
-        current.append(name)
-        savefave(current)
+def addfav(name, filepath):
+    favorites = loadfave(filepath)
+    if name not in favorites:
+        favorites.append(name)
+        savefave(favorites, filepath)
 
-def removefave(name):
-    current = loadfave()
-    if name in current: 
-        current.remove(name)
-        savefave(current)
+def removefave(name, filepath):
+    favorites = loadfave(filepath)
+    if name in favorites:
+        favorites.remove(name)
+        savefave(favorites, filepath)
