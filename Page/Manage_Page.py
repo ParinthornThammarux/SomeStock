@@ -72,7 +72,7 @@ class ManagePage(QMainWindow):
         main_layout.addLayout(file_layout)
 
         # ---------- Input Section ----------
-        symbol_label = QLabel("🔤 สัญลักษณ์หุ้น (เช่น AAPL):")
+        symbol_label = QLabel("🔤 สัญลักษณ์หุ้น :")
         self.ticker_entry = QLineEdit()
         self.ticker_entry.setPlaceholderText("พิมพ์ชื่อหุ้นที่นี่...")
 
