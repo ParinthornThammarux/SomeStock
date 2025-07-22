@@ -1,30 +1,29 @@
-# Fetch/Manage_FAV.py
-
 import json
 import os
 
-def loadfave(filepath):
-    if not os.path.exists(filepath):
+FAVORITE_FILE = 'favorite_stocks.json'
+def loadfave():
+    if not os.path.exists(FAVORITE_FILE):
         return []
-    with open(filepath, 'r') as f:
+    with open(FAVORITE_FILE, 'r') as f:
         try:
             return json.load(f)
         except json.JSONDecodeError:
             return []
 
-def savefave(favorites, filepath):
+def savefave(favorites):
     favorites.sort()
-    with open(filepath, 'w') as f:
-        json.dump(favorites, f, ensure_ascii=False, indent=2)
+    with open(FAVORITE_FILE, 'w') as f:
+        json.dump(favorites, f)
 
-def addfav(name, filepath):
-    current = loadfave(filepath)
+def addfav(name):
+    current = loadfave()
     if name not in current:
         current.append(name)
-        savefave(current, filepath)
+        savefave(current)
 
-def removefave(name, filepath):
-    current = loadfave(filepath)
-    if name in current:
+def removefave(name):
+    current = loadfave()
+    if name in current: 
         current.remove(name)
-        savefave(current, filepath)
+        savefave(current)
