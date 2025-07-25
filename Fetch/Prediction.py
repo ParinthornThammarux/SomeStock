@@ -1,8 +1,8 @@
 import os
 import joblib
-from sklearn.linear_model import LinearRegression
-import yfinance as yf
+import math
 import numpy as np
+import yfinance as yf
 import talib
 import matplotlib.pyplot as plt
 import mplfinance as mpf
@@ -11,9 +11,9 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from bs4 import BeautifulSoup
-import math
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
+from sklearn.linear_model import LinearRegression
 
 # ==================== Dataset ====================
 class StockDataset(Dataset):
@@ -57,14 +57,12 @@ def train_model(symbol, window_size=10, epochs=100):
     df = fetch_data(symbol)
     close_prices = df["Close"].values.reshape(-1, 1)
 
-    # Scaling
     scaler = MinMaxScaler()
     scaled_prices = scaler.fit_transform(close_prices).flatten()
 
-    # Train/test split
     split = int(len(scaled_prices) * 0.8)
     train_data = scaled_prices[:split]
-    test_data = scaled_prices[split - window_size:]  # include overlap for context
+    test_data = scaled_prices[split - window_size:]
 
     train_dataset = StockDataset(train_data, window_size)
     test_dataset = StockDataset(test_data, window_size)
@@ -84,7 +82,6 @@ def train_model(symbol, window_size=10, epochs=100):
             loss.backward()
             optimizer.step()
 
-    # Evaluate RMSE
     model.eval()
     test_X = torch.tensor(test_dataset.X)
     preds = model(test_X).detach().numpy()
@@ -92,7 +89,6 @@ def train_model(symbol, window_size=10, epochs=100):
     rmse = math.sqrt(mean_squared_error(y_true, preds))
     print(f"📉 Test RMSE: {rmse:.4f}")
 
-    # Save model + scaler
     os.makedirs("Model", exist_ok=True)
     torch.save(model.state_dict(), f"Model/{symbol}_model.pt")
     np.save(f"Model/{symbol}_scaler.npy", scaler.data_max_)
@@ -100,7 +96,7 @@ def train_model(symbol, window_size=10, epochs=100):
 
     return model, scaler
 
-# ==================== Load Model ====================
+# ==================== Load Model & Scaler ====================
 def load_model(symbol, window_size=10):
     model = StockPriceModel(window_size)
     path = f"Model/{symbol}_model.pt"
@@ -120,8 +116,8 @@ def load_scaler(symbol):
         return scaler
     return None
 
-# ==================== Predict ====================
-def predict_next_price(symbol, window_size=10):
+# ==================== Price Prediction ====================
+def predict_next_price(symbol, window_size=10, plot=True):
     df = fetch_data(symbol)
     close_prices = df["Close"].values.reshape(-1, 1)
 
@@ -141,105 +137,44 @@ def predict_next_price(symbol, window_size=10):
 
     print(f"📈 {symbol} - Predicted next close price: ${predicted_price:.2f}")
 
-    # Plot
-    plt.plot(np.arange(len(close_prices)), close_prices, label="Actual Price")
-    plt.scatter(len(close_prices), predicted_price, color="red", label="Predicted")
-    plt.title(f"{symbol} - Forecasted Price")
-    plt.xlabel("Days")
-    plt.ylabel("Price")
-    plt.legend()
-    plt.grid()
-    plt.tight_layout()
-    plt.show()
+    if plot:
+        plt.plot(np.arange(len(close_prices)), close_prices, label="Actual Price")
+        plt.scatter(len(close_prices), predicted_price, color="red", label="Predicted")
+        plt.title(f"{symbol} - Forecasted Price")
+        plt.xlabel("Days")
+        plt.ylabel("Price")
+        plt.legend()
+        plt.grid()
+        plt.tight_layout()
+        plt.show()
 
     return predicted_price
 
 # ==================== RSI Prediction ====================
-def predict_rsi(symbol):
+def predict_rsi(symbol, plot=True):
     data = fetch_data(symbol)
     data['RSI'] = talib.RSI(data['Close'], timeperiod=14)
 
     latest_rsi = data['RSI'].iloc[-1]
     print(f"📈 {symbol} - Latest RSI: {latest_rsi:.2f}")
 
-    plt.figure(figsize=(10, 5))
-    plt.plot(data['Date'], data['RSI'], label='RSI', color='purple')
-    plt.axhline(70, color='red', linestyle='--', label='Overbought (70)')
-    plt.axhline(30, color='green', linestyle='--', label='Oversold (30)')
-    plt.title(f"{symbol} - RSI (14)")
-    plt.xlabel("Date")
-    plt.ylabel("RSI")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
+    if plot:
+        plt.figure(figsize=(10, 5))
+        plt.plot(data['Date'], data['RSI'], label='RSI', color='purple')
+        plt.axhline(70, color='red', linestyle='--', label='Overbought (70)')
+        plt.axhline(30, color='green', linestyle='--', label='Oversold (30)')
+        plt.title(f"{symbol} - RSI (14)")
+        plt.xlabel("Date")
+        plt.ylabel("RSI")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
 
     return latest_rsi
 
-# ==================== Hammer Candlestick Detection ====================
-def detect_hammer(symbol):
-    data = fetch_data(symbol)
-    data.set_index('Date', inplace=True)
-    data['Hammer'] = talib.CDLHAMMER(data['Open'], data['High'], data['Low'], data['Close'])
-
-    hammer_days = data[data['Hammer'] != 0]
-
-    if not hammer_days.empty:
-        print(f"📈 {symbol} - Hammer detected on the following dates:")
-        for date in hammer_days.index:
-            print(f"  - {date.date()}: {hammer_days.loc[date, 'Hammer']}")
-    else:
-        print(f"📈 {symbol} - No Hammer detected in the last year.")
-
-    add_plot = mpf.make_addplot(hammer_days['Low'], type='scatter', markersize=100, marker='v', color='red')
-    mpf.plot(
-        data,
-        type='candle',
-        style='yahoo',
-        title=f'{symbol} - Candlestick with Hammer Pattern',
-        ylabel='Price',
-        volume=True,
-        addplot=add_plot,
-        figscale=1.2,
-        figratio=(16, 9),
-        tight_layout=True
-    )
-
-    return hammer_days
-
-# ==================== Doji Candlestick Detection ====================
-def detect_doji(symbol):
-    data = fetch_data(symbol)
-    data.set_index('Date', inplace=True)
-    data['Doji'] = talib.CDLDOJI(data['Open'], data['High'], data['Low'], data['Close'])
-
-    doji_days = data[data['Doji'] != 0]
-
-    if not doji_days.empty:
-        print(f"📈 {symbol} - Doji detected on the following dates:")
-        for date in doji_days.index:
-            print(f"  - {date.date()}: {doji_days.loc[date, 'Doji']}")
-    else:
-        print(f"📈 {symbol} - No Doji detected in the last year.")
-
-    add_plot = mpf.make_addplot(doji_days['Low'], type='scatter', markersize=100, marker='v', color='blue')
-    mpf.plot(
-        data,
-        type='candle',
-        style='yahoo',
-        title=f'{symbol} - Candlestick with Doji Pattern',
-        ylabel='Price',
-        volume=True,
-        addplot=add_plot,
-        figscale=1.2,
-        figratio=(16, 9),
-        tight_layout=True
-    )
-
-    return doji_days
-
 # ==================== EMA Cross Detection ====================
-def detect_ema_cross(symbol):
+def detect_ema_cross(symbol, plot=True):
     data = fetch_data(symbol)
     data.set_index('Date', inplace=True)
 
@@ -254,190 +189,165 @@ def detect_ema_cross(symbol):
     if not cross_days.empty:
         print(f"📈 {symbol} - EMA Cross detected on:")
         for date in cross_days.index:
-            cross_type = "Bullish Cross (12 > 26)" if cross_days.loc[date, 'Cross'] == 1 else "Bearish Cross (12 < 26)"
+            cross_type = "Bullish" if cross_days.loc[date, 'Cross'] == 1 else "Bearish"
             print(f"  - {date.date()}: {cross_type}")
     else:
         print(f"📉 {symbol} - No EMA Cross in the last year.")
 
-    plt.figure(figsize=(14, 7))
-    plt.plot(data.index, data['Close'], label='Close Price', alpha=0.3)
-    plt.plot(data.index, data['EMA_12'], label='EMA 12', color='blue')
-    plt.plot(data.index, data['EMA_26'], label='EMA 26', color='orange')
+    if plot:
+        plt.figure(figsize=(14, 7))
+        plt.plot(data.index, data['Close'], label='Close Price', alpha=0.3)
+        plt.plot(data.index, data['EMA_12'], label='EMA 12', color='blue')
+        plt.plot(data.index, data['EMA_26'], label='EMA 26', color='orange')
 
-    bullish = cross_days[cross_days['Cross'] == 1]
-    bearish = cross_days[cross_days['Cross'] == -1]
-    plt.scatter(bullish.index, bullish['Close'], marker='^', color='green', label='Bullish Cross', s=100)
-    plt.scatter(bearish.index, bearish['Close'], marker='v', color='red', label='Bearish Cross', s=100)
+        bullish = cross_days[cross_days['Cross'] == 1]
+        bearish = cross_days[cross_days['Cross'] == -1]
+        plt.scatter(bullish.index, bullish['Close'], marker='^', color='green', label='Bullish Cross', s=100)
+        plt.scatter(bearish.index, bearish['Close'], marker='v', color='red', label='Bearish Cross', s=100)
 
-    plt.title(f"{symbol} - EMA 12/26 Crossover")
-    plt.xlabel("Date")
-    plt.ylabel("Price")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
+        plt.title(f"{symbol} - EMA 12/26 Crossover")
+        plt.xlabel("Date")
+        plt.ylabel("Price")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
 
     return cross_days
 
-# ==================== PEG Ratio Prediction ====================
-def predict_peg_ratio(symbol):
-    url = f"https://finviz.com/quote.ashx?t={symbol}"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    r = requests.get(url, headers=headers)
-    soup = BeautifulSoup(r.text, "html.parser")
-
-    table = soup.find("table", class_="snapshot-table2")
-    if not table:
-        print("❌ Table not found.")
-        return None
-
-    for row in table.find_all("tr"):
-        cells = row.find_all("td")
-        for i in range(0, len(cells), 2):
-            if cells[i].text == "PEG":
-                peg = cells[i+1].text
-                try:
-                    peg_value = float(peg)
-                    print(f"📊 {symbol} - PEG Ratio: {peg_value}")
-                    return peg_value
-                except ValueError:
-                    print(f"⚠️ PEG Ratio not available or invalid: {peg}")
-                    return None
-    return None
-
-# ==================== MACD Prediction ====================
-def predict_MACD(symbol):
+# ==================== MACD ====================
+def plot_macd(symbol, plot=True):
     data = fetch_data(symbol)
-    data.set_index('Date', inplace=True)
+    macd, macdsignal, macdhist = talib.MACD(data['Close'], fastperiod=12, slowperiod=26, signalperiod=9)
 
-    macd, macd_signal, macd_hist = talib.MACD(data['Close'], fastperiod=12, slowperiod=26, signalperiod=9)
-    data['MACD'] = macd
-    data['Signal'] = macd_signal
-    data['Hist'] = macd_hist
+    if plot:
+        plt.figure(figsize=(12, 6))
+        plt.plot(data['Date'], macd, label='MACD', color='blue')
+        plt.plot(data['Date'], macdsignal, label='Signal Line', color='red')
+        plt.bar(data['Date'], macdhist, label='Histogram', color='grey')
+        plt.title(f"{symbol} - MACD")
+        plt.xlabel("Date")
+        plt.ylabel("MACD Value")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
 
-    plt.figure(figsize=(14, 7))
-    plt.plot(data.index, data['MACD'], label='MACD', color='blue')
-    plt.plot(data.index, data['Signal'], label='Signal Line', color='red')
-    plt.bar(data.index, data['Hist'], label='MACD Histogram', color='grey', alpha=0.5)
-    plt.title(f"{symbol} - MACD Indicator")
-    plt.xlabel("Date")
-    plt.ylabel("MACD Value")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
+    return macd, macdsignal, macdhist
 
-    latest_macd = data['MACD'].iloc[-1]
-    latest_signal = data['Signal'].iloc[-1]
-    print(f"📈 {symbol} - Latest MACD: {latest_macd:.2f}, Signal Line: {latest_signal:.2f}")
-
-    prev_macd = data['MACD'].iloc[-2]
-    prev_signal = data['Signal'].iloc[-2]
-
-    if prev_macd < prev_signal and latest_macd > latest_signal:
-        print("📊 Bullish MACD crossover detected!")
-    elif prev_macd > prev_signal and latest_macd < latest_signal:
-        print("📉 Bearish MACD crossover detected!")
-    else:
-        print("ℹ️ No MACD crossover at the latest date.")
-
-    return latest_macd, latest_signal
-
-# ==================== Polynomial Regression Prediction ====================
-def predict_price_binomial(symbol):
+# ==================== Doji Candlestick ====================
+def detect_doji(symbol, plot=True):
     data = fetch_data(symbol)
-    y = data['Close'].values
-    x = np.arange(len(y))
+    body = abs(data['Close'] - data['Open'])
+    range_ = data['High'] - data['Low']
+    doji = (body / range_) < 0.1  # body less than 10% of range
 
-    coefficients = np.polyfit(x, y, 2)
-    polynomial = np.poly1d(coefficients)
+    dates = data['Date'][doji]
 
-    next_x = np.array([len(y)])
-    predicted_y = polynomial(next_x)
-    print(f"📈 {symbol} - Predicted next close price using polynomial regression: ${predicted_y[0]:.2f}")
+    if plot:
+        mc = mpf.make_marketcolors(up='g', down='r', inherit=True)
+        s = mpf.make_mpf_style(marketcolors=mc)
+        addplots = [mpf.make_addplot(doji.astype(int), type='bar', panel=1, color='b', alpha=0.5)]
+        mpf.plot(data.set_index('Date'), type='candle', style=s, addplot=addplots, title=f"{symbol} - Doji Candles")
 
-    plt.figure(figsize=(10, 5))
-    plt.plot(x, y, label='Actual Price', color='blue')
-    plt.plot(x, polynomial(x), label='Polynomial Fit', color='red')
-    plt.scatter(next_x, predicted_y, color='green', s=100, label='Prediction')
-    plt.title(f"{symbol} - Polynomial Regression (degree=2)")
-    plt.xlabel("Days")
-    plt.ylabel("Price")
-    plt.legend()
-    plt.grid()
-    plt.show()
-    return predicted_y[0]
+    print(f"🕯️ {symbol} - Detected Doji on dates: {[str(d.date()) for d in dates.tolist()]}")
+    return dates.tolist()
 
-# ==================== Momentum Prediction ====================
-def predict_momentum(symbol):
+# ==================== Hammer Candlestick ====================
+def detect_hammer(symbol, plot=True):
     data = fetch_data(symbol)
-    data.set_index('Date', inplace=True)
-    data['Momentum'] = talib.MOM(data['Close'], timeperiod=10)
 
-    latest_momentum = data['Momentum'].iloc[-1]
-    print(f"📈 {symbol} - Latest Momentum: {latest_momentum:.2f}")
+    body = abs(data['Close'] - data['Open'])
+    lower_shadow = data['Open'].where(data['Close'] > data['Open'], data['Close']) - data['Low']
+    upper_shadow = data['High'] - data['Close'].where(data['Close'] > data['Open'], data['Open'])
 
-    plt.figure(figsize=(10, 6))
-    plt.plot(data.index, data['Momentum'], label='Momentum', color='purple')
-    plt.axhline(0, color='black', linestyle='--', label='Zero Line')
-    plt.title(f"{symbol} - Momentum (10)")
-    plt.xlabel("Date")
-    plt.ylabel("Momentum")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
+    hammer = (lower_shadow >= 2 * body) & (upper_shadow <= 0.1 * body)
 
-    return latest_momentum
+    dates = data['Date'][hammer]
 
-def predict_aroon(symbol):
+    if plot:
+        mc = mpf.make_marketcolors(up='g', down='r', inherit=True)
+        s = mpf.make_mpf_style(marketcolors=mc)
+        addplots = [mpf.make_addplot(hammer.astype(int), type='bar', panel=1, color='m', alpha=0.5)]
+        mpf.plot(data.set_index('Date'), type='candle', style=s, addplot=addplots, title=f"{symbol} - Hammer Candles")
+
+    print(f"🔨 {symbol} - Detected Hammer on dates: {[str(d.date()) for d in dates.tolist()]}")
+    return dates.tolist()
+
+# ==================== Polynomial Regression ====================
+def polynomial_regression(symbol, degree=3, plot=True):
+    df = fetch_data(symbol)
+    x = np.arange(len(df)).reshape(-1, 1)
+    y = df['Close'].values
+
+    poly_features = np.vander(x.flatten(), degree + 1)
+    model = LinearRegression()
+    model.fit(poly_features, y)
+    y_pred = model.predict(poly_features)
+
+    if plot:
+        plt.figure(figsize=(12, 6))
+        plt.plot(df['Date'], y, label='Actual Price')
+        plt.plot(df['Date'], y_pred, label=f'Polynomial Regression (deg {degree})', linestyle='--')
+        plt.title(f"{symbol} - Polynomial Regression Degree {degree}")
+        plt.xlabel("Date")
+        plt.ylabel("Price")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+
+    return y_pred
+
+# ==================== Aroon Indicator ====================
+def aroon_indicator(symbol, period=14, plot=True):
     data = fetch_data(symbol)
-    data.set_index('Date', inplace=True)
+    aroon_up, aroon_down = talib.AROON(data['High'], data['Low'], timeperiod=period)
 
-    data['Aroon_Up'], data['Aroon_Down'] = talib.AROON(data['High'], data['Low'], timeperiod=14)
+    if plot:
+        plt.figure(figsize=(12, 6))
+        plt.plot(data['Date'], aroon_up, label='Aroon Up', color='green')
+        plt.plot(data['Date'], aroon_down, label='Aroon Down', color='red')
+        plt.title(f"{symbol} - Aroon Indicator")
+        plt.xlabel("Date")
+        plt.ylabel("Aroon Value")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
 
-    plt.figure(figsize=(10, 5))
-    plt.plot(data.index, data['Aroon_Up'], label='Aroon Up', color='green')
-    plt.plot(data.index, data['Aroon_Down'], label='Aroon Down', color='red')
-    plt.axhline(70, color='blue', linestyle='--', label='Overbought (70)')
-    plt.axhline(30, color='orange', linestyle='--', label='Oversold (30)')
-    plt.title(f"{symbol} - Aroon Indicator")
-    plt.xlabel("Date")
-    plt.ylabel("Aroon Value")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
+    return aroon_up, aroon_down
 
-    latest_aroon_up = data['Aroon_Up'].iloc[-1]
-    latest_aroon_down = data['Aroon_Down'].iloc[-1]
-    prev_aroon_up = data['Aroon_Up'].iloc[-2]
-    prev_aroon_down = data['Aroon_Down'].iloc[-2]
-    print(f"📈 {symbol} - Latest Aroon Up: {latest_aroon_up:.2f}, Aroon Down: {latest_aroon_down:.2f}")
-
-    signal = None
-    if prev_aroon_up < prev_aroon_down and latest_aroon_up > latest_aroon_down and latest_aroon_up > 50:
-        signal = "BUY"
-        print("✅ Buy Signal: Aroon Up crossed above Aroon Down and is strong (>50).")
-    elif prev_aroon_down < prev_aroon_up and latest_aroon_down > latest_aroon_up and latest_aroon_down > 50:
-        signal = "SELL"
-        print("❌ Sell Signal: Aroon Down crossed above Aroon Up and is strong (>50).")
-    else:
-        signal = "HOLD"
-        print("⚠️ No clear signal. Market may be sideways or indecisive.")
-    return latest_aroon_up, latest_aroon_down,signal
-
-def sushiroll(symbol):
+# ==================== Momentum ====================
+def momentum(symbol, period=10, plot=True):
     data = fetch_data(symbol)
-    data.set_index('Date', inplace=True)
+    mom = talib.MOM(data['Close'], timeperiod=period)
 
-    open = data['Open']
-    close = data['Close']
+    if plot:
+        plt.figure(figsize=(12, 6))
+        plt.plot(data['Date'], mom, label=f'Momentum ({period})', color='purple')
+        plt.title(f"{symbol} - Momentum")
+        plt.xlabel("Date")
+        plt.ylabel("Momentum")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
 
-    condi1  = close.shift(1) < open.shift(1)
-    condi2 = close > open
-    condi3 = open< close.shift(1)
-    condi4 = close > open.shift(1)
+    return mom
 
-    mpf.plot(data, type='candle', addplot=ap, volume=True, title=f"{symbol} Sushi Roll Reverse Pattern")
-    return condi1 & condi2 & condi3 & condi4
+# ==================== PEG Ratio Scraper ====================
+def fetch_peg_ratio(symbol):
+    url = f"https://finance.yahoo.com/quote/{symbol}/key-statistics?p={symbol}"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    res = requests.get(url, headers=headers)
+
+    soup = BeautifulSoup(res.text, 'html.parser')
+    peg_ratio = None
+    for tr in soup.find_all('tr'):
+        if 'PEG Ratio' in tr.text:
+            peg_ratio = tr.find_all('td')[1].text.strip()
+            break
+
+    print(f"🔢 {symbol} - PEG Ratio: {peg_ratio}")
+    return peg_ratio

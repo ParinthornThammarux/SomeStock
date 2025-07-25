@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QLineEdit, QTextEdit, QPushButton, QComboBox, QListWidget,
-    QListWidgetItem, QFileDialog
+    QListWidgetItem, QFileDialog, QCheckBox
 )
 from PySide6.QtCore import Qt
 from Fetch import Prediction
@@ -48,6 +48,10 @@ class PredictionWindow(QMainWindow):
         ])
         self.combo.setPlaceholderText("Select an option")
         left_layout.addWidget(self.combo)
+
+        # ✅ CheckBox for graph
+        self.graph_checkbox = QCheckBox("📊 แสดงกราฟ")
+        left_layout.addWidget(self.graph_checkbox)
 
         self.predict_button = QPushButton("🔮 Predict stock")
         self.predict_button.clicked.connect(self.predict_stock)
@@ -110,6 +114,54 @@ class PredictionWindow(QMainWindow):
         self.Main_window.show()
         self.hide()
 
+    def load_json_and_predict(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "เลือกไฟล์ JSON หุ้น", "", "JSON Files (*.json);;All Files (*)"
+        )
+        if not file_path:
+            return
+
+        import pandas as pd
+        import json
+
+        try:
+            with open(file_path, "r") as f:
+                raw_data = json.load(f)
+            df = pd.DataFrame(raw_data)
+
+            if "Date" in df.columns:
+                df["Date"] = pd.to_datetime(df["Date"])
+                df.set_index("Date", inplace=True)
+
+            option = self.combo.currentText()
+            self.result_text.clear()
+            symbol = os.path.basename(file_path).split(".")[0].upper()
+            show_graph = self.graph_checkbox.isChecked()
+
+            match option:
+                case "RSI":
+                    result = Prediction.predict_rsi_from_df(df, plot=show_graph)
+                case "MACD":
+                    result = Prediction.predict_macd_from_df(df, plot=show_graph)
+                case "Trending":
+                    result = Prediction.predict_momentum_from_df(df, plot=show_graph)
+                case "Aroon":
+                    result = Prediction.predict_aroon_from_df(df, plot=show_graph)
+                case "Hammer search":
+                    result = Prediction.detect_hammer_from_df(df, plot=show_graph)
+                case "Doji search":
+                    result = Prediction.detect_doji_from_df(df, plot=show_graph)
+                case "Sushi":
+                    result = Prediction.sushiroll_from_df(df, plot=show_graph)
+                case _:
+                    result = "❌ ฟังก์ชันนี้ยังไม่รองรับการเรียกจาก JSON"
+
+            self.result_text.append(f"📊 JSON Prediction for {symbol}:\n{result}\n")
+            self.result_text.append(f"🧠 Method used: {option}\n{'-'*50}")
+
+        except Exception as e:
+            self.result_text.setText(f"❌ Error loading JSON: {e}")
+
     def predict_stock(self):
         symbols = [s.strip().upper() for s in self.label_input.text().split(",") if s.strip()]
         if not symbols:
@@ -118,38 +170,39 @@ class PredictionWindow(QMainWindow):
 
         option = self.combo.currentText()
         self.result_text.clear()
+        show_graph = self.graph_checkbox.isChecked()
 
         for symbol in symbols:
             try:
                 match option:
                     case "PricePrediction":
-                        result = Prediction.predict_next_price(symbol)
+                        result = Prediction.predict_next_price(symbol, plot=show_graph)
                     case "RSI":
-                        result = Prediction.predict_rsi(symbol)
+                        result = Prediction.predict_rsi(symbol, plot=show_graph)
                     case "Hammer search":
-                        result = Prediction.detect_hammer(symbol)
+                        result = Prediction.detect_hammer(symbol, plot=show_graph)
                     case "Doji search":
-                        result = Prediction.detect_doji(symbol)
+                        result = Prediction.detect_doji(symbol, plot=show_graph)
                     case "EMA Cross":
-                        result = Prediction.detect_ema_cross(symbol)
+                        result = Prediction.detect_ema_cross(symbol, plot=show_graph)
                     case "PEG Ratio":
                         result = Prediction.predict_peg_ratio(symbol)
                     case "MACD":
-                        result = Prediction.predict_MACD(symbol)
+                        result = Prediction.predict_MACD(symbol, plot=show_graph)
                     case "Binomial Prediction":
                         result = Prediction.predict_price_binomial(symbol)
                     case "Trending":
-                        result = Prediction.predict_momentum(symbol)
+                        result = Prediction.predict_momentum(symbol, plot=show_graph)
                     case "Aroon":
-                        result = Prediction.predict_aroon(symbol)
+                        result = Prediction.predict_aroon(symbol, plot=show_graph)
                     case "Sushi":
-                        result = Prediction.sushiroll(symbol)
+                        result = Prediction.sushiroll(symbol, plot=show_graph)
                     case "VMA":
-                        result = Prediction.VMA(symbol)
+                        result = Prediction.VMA(symbol, plot=show_graph)
                     case "ROC":
-                        result = Prediction.calculate_Roc(symbol)
+                        result = Prediction.calculate_Roc(symbol, plot=show_graph)
                     case "WILLR":
-                        result = Prediction.calculate_WILLR(symbol)
+                        result = Prediction.calculate_WILLR(symbol, plot=show_graph)
                     case _:
                         result = "❌ ไม่พบตัวเลือกที่คุณเลือก"
 
