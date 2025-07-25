@@ -7,7 +7,7 @@ favorite_stocks.json
 TFEX_Favorites.json
 # C extensions
 *.so
-
+*.json
 # Distribution / packaging
 .Python
 build/
