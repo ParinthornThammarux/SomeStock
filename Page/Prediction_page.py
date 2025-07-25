@@ -75,6 +75,10 @@ class PredictionWindow(QMainWindow):
         self.choose_file_btn.clicked.connect(self.select_favorite_file)
         right_layout.addWidget(self.choose_file_btn)
 
+        self.select_all_btn = QPushButton("📋 เลือกทั้งหมดจาก Favorites")
+        self.select_all_btn.clicked.connect(self.selectall_favorites)
+        right_layout.addWidget(self.select_all_btn)
+
         self.fav_list = QListWidget()
         self.fav_list.itemClicked.connect(self.favorite_clicked)
         right_layout.addWidget(self.fav_list)
@@ -113,6 +117,17 @@ class PredictionWindow(QMainWindow):
             self.Main_window = MainWindow()
         self.Main_window.show()
         self.hide()
+    
+    def selectall_favorites(self):
+        if not self.favorite_file:
+            self.result_text.setText("⚠ ยังไม่ได้เลือกไฟล์รายการโปรด")
+            return
+        favorites = loadfave(self.favorite_file)
+        if not favorites:
+            self.result_text.setText("⚠ ไฟล์รายการโปรดว่างเปล่า")
+            return
+        self.label_input.setText(",".join(favorites))
+
 
     def load_json_and_predict(self):
         file_path, _ = QFileDialog.getOpenFileName(
