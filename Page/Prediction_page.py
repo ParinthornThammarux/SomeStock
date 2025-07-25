@@ -8,6 +8,8 @@ from Fetch import Prediction
 from Fetch.Manage_FAV import loadfave
 
 import os
+import pandas as pd
+import json
 
 
 class PredictionWindow(QMainWindow):
@@ -15,10 +17,9 @@ class PredictionWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("📈 Stock Prediction")
         self.setGeometry(200, 100, 900, 700)
-
         self.favorite_file = None
+        self.Main_window = None
 
-        # --- Central Widget ---
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
@@ -49,7 +50,6 @@ class PredictionWindow(QMainWindow):
         self.combo.setPlaceholderText("Select an option")
         left_layout.addWidget(self.combo)
 
-        # ✅ CheckBox for graph
         self.graph_checkbox = QCheckBox("📊 แสดงกราฟ")
         left_layout.addWidget(self.graph_checkbox)
 
@@ -85,8 +85,6 @@ class PredictionWindow(QMainWindow):
 
         main_layout.addLayout(right_layout)
 
-        self.Main_window = None
-
     def select_favorite_file(self):
         file_path, _ = QFileDialog.getOpenFileName(
             self, "เลือกไฟล์รายการโปรด", "", "JSON Files (*.json);;All Files (*)"
@@ -111,13 +109,6 @@ class PredictionWindow(QMainWindow):
         else:
             self.label_input.setText(item.text())
 
-    def open_Main_window(self):
-        from main import MainWindow
-        if self.Main_window is None:
-            self.Main_window = MainWindow()
-        self.Main_window.show()
-        self.hide()
-    
     def selectall_favorites(self):
         if not self.favorite_file:
             self.result_text.setText("⚠ ยังไม่ได้เลือกไฟล์รายการโปรด")
@@ -128,6 +119,12 @@ class PredictionWindow(QMainWindow):
             return
         self.label_input.setText(",".join(favorites))
 
+    def open_Main_window(self):
+        from main import MainWindow
+        if self.Main_window is None:
+            self.Main_window = MainWindow()
+        self.Main_window.show()
+        self.hide()
 
     def load_json_and_predict(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -135,9 +132,6 @@ class PredictionWindow(QMainWindow):
         )
         if not file_path:
             return
-
-        import pandas as pd
-        import json
 
         try:
             with open(file_path, "r") as f:
@@ -159,7 +153,7 @@ class PredictionWindow(QMainWindow):
                 case "MACD":
                     result = Prediction.predict_macd_from_df(df, plot=show_graph)
                 case "Trending":
-                    result = Prediction.predict_momentum_from_df(df, plot=show_graph)
+                    result = Prediction.predict_momentum_df(df, plot=show_graph)
                 case "Aroon":
                     result = Prediction.predict_aroon_from_df(df, plot=show_graph)
                 case "Hammer search":
@@ -207,7 +201,7 @@ class PredictionWindow(QMainWindow):
                     case "Binomial Prediction":
                         result = Prediction.predict_price_binomial(symbol)
                     case "Trending":
-                        result = Prediction.predict_momentum(symbol, plot=show_graph)
+                        result = Prediction.momentum(symbol, plot=show_graph)
                     case "Aroon":
                         result = Prediction.predict_aroon(symbol, plot=show_graph)
                     case "Sushi":
