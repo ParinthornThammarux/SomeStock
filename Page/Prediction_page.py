@@ -45,7 +45,7 @@ class PredictionWindow(QMainWindow):
 
         self.combo = QComboBox()
         self.combo.addItems([
-            "RSI", "PricePrediction", "Binomial Prediction", "Hammer search", "Doji search",
+            "RSI", "PricePrediction","Linear Regression Price", "Binomial Prediction", "Hammer search", "Doji search",
             "EMA Cross", "PEG Ratio", "MACD", "Trending", "Aroon", "Sushi", "VMA", "ROC", "WILLR"
         ])
         self.combo.setPlaceholderText("Select an option")
@@ -155,6 +155,7 @@ class PredictionWindow(QMainWindow):
                     result = Prediction.predict_macd_from_df(df, plot=show_graph)
                 case "Trending":
                     result = Prediction.predict_momentum_df(df, plot=show_graph)
+                    
                 case "Aroon":
                     result = Prediction.predict_aroon_from_df(df, plot=show_graph)
                 case "Hammer search":
@@ -185,6 +186,8 @@ class PredictionWindow(QMainWindow):
         for symbol in symbols:
             try:
                 match option:
+                    case "Linear Regression Price":
+                        result = Prediction.liner_regression(symbol, plot=show_graph)
                     case "PricePrediction":
                         result = Prediction.predict_next_price(symbol, plot=show_graph)
                     case "RSI":
