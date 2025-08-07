@@ -6,7 +6,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from Fetch import Prediction
 from Fetch.Manage_FAV import loadfave
-
+import threading
+from concurrent.futures import ThreadPoolExecutor
 import os
 import pandas as pd
 import json
