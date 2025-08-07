@@ -8,6 +8,9 @@ chart_tags = {}
 from utils.stock_fetch_layer import fetch_stock_data
 from components.stock.stock_data_manager import add_stock_tag
 
+search_mode = "callback" 
+search_callback_func = None
+
 def load_stock_data():
     """Load stock data from JSON file on startup"""
     global stock_data
@@ -25,22 +28,27 @@ def load_stock_data():
         print(f"Error loading stock data: {e}")
         stock_data = None
 
-def create_stock_search(line_tag, x_axis_tag, y_axis_tag, plot_tag):
+def create_stock_search(mode="callback", callback=None, line_tag=None, x_axis_tag=None, y_axis_tag=None, plot_tag=None):
+    """
+    Create stock search popup
     
-    # Check if popup already exists and delete it
-    if dpg.does_item_exist("stock_search_popup"):
-        dpg.delete_item("stock_search_popup")
+    Args:
+        mode: "callback" or "chart" (programmer specifies)
+        callback: Function to call with selected symbol (callback mode)
+        line_tag, x_axis_tag, y_axis_tag, plot_tag: Chart tags (chart mode)
+    """
+    global search_mode, search_callback_func, chart_tags
     
-    # Use global chart_tags
-    global chart_tags
+    search_mode = mode
+    search_callback_func = callback
     
-    # Store the tags for use in callbacks
-    chart_tags = {
-        'line_tag': line_tag,
-        'x_axis_tag': x_axis_tag,
-        'y_axis_tag': y_axis_tag,
-        'plot_tag': plot_tag
-    }
+    if line_tag and x_axis_tag and y_axis_tag and plot_tag:
+        chart_tags = {
+            'line_tag': line_tag,
+            'x_axis_tag': x_axis_tag,
+            'y_axis_tag': y_axis_tag,
+            'plot_tag': plot_tag
+        }
     
     # Get mouse position
     mouse_pos = dpg.get_mouse_pos()
@@ -74,23 +82,25 @@ def create_stock_search(line_tag, x_axis_tag, y_axis_tag, plot_tag):
             dpg.add_table_column(label="Market Cap", width_fixed=False, init_width_or_weight=100)
 
 def search_callback():
+    global search_mode, search_callback_func
+    
     symbol = dpg.get_value('stock_name').strip().upper()
-    print(f"Searching for: {symbol}")
+    print(f"Search for: {symbol} (mode: {search_mode})")
     
     if symbol:
-        # Create a stock_data dict for manual entry with empty company name
-        manual_stock_data = {
-            'symbol': symbol,
-            'company_name': ""  # Empty company name
-        }
-        
-        # Call row_clicked with the properly formatted data
-        row_clicked(manual_stock_data)
+        if search_mode == "callback" and search_callback_func:
+            search_callback_func(symbol)
+        elif search_mode == "chart":
+            manual_stock_data = {
+                'symbol': symbol,
+                'company_name': f"{symbol} Corp."
+            }
+            row_clicked_chart_mode(manual_stock_data)
     
     # Close the popup
     if dpg.does_item_exist("stock_search_popup"):
         dpg.delete_item("stock_search_popup")
-
+        
 def create_table_button_theme():
     """Create a theme that makes buttons look like normal table text"""
     with dpg.theme(tag="table_button_theme"):
@@ -186,42 +196,50 @@ def typing_callback():
 
             
 def row_clicked(stock_data):
-    """Handle stock selection with unified fetch - SIMPLIFIED"""
-    symbol = stock_data['symbol']
-    company_name = stock_data['company_name']
+    """Handle stock selection based on programmer-specified mode"""
+    global search_mode, search_callback_func
     
-    print(f"Selected stock: {symbol} - {company_name}")
+    symbol = stock_data['symbol']
     
     # Close popup
     if dpg.does_item_exist("stock_search_popup"):
         dpg.delete_item("stock_search_popup")
     
-    # Add stock tag first (creates UI and cache entry)
+    if search_mode == "callback" and search_callback_func:
+        search_callback_func(symbol)
+    elif search_mode == "chart":
+        row_clicked_chart_mode(stock_data)
+
+def row_clicked_chart_mode(stock_data):
+    """Chart mode functionality - works with or without chart tags"""
+    symbol = stock_data['symbol']
+    company_name = stock_data['company_name']
+    
     try:
         from components.stock.stock_data_manager import add_stock_tag
         
+        # Create stock tag (will be created in the default container)
         tag = add_stock_tag(symbol, company_name)
         
         if tag:
-            # Check if we need to fetch data
-            if not tag.stock_data.is_cache_valid():
-                print(f"🔄 Fetching all data for {symbol}")
-                # Use existing stockdx_layer function - it will handle everything
-                fetch_stock_data(
-                    symbol,
-                    chart_tags['line_tag'],
-                    chart_tags['x_axis_tag'],
-                    chart_tags['y_axis_tag'],
-                    chart_tags['plot_tag']
-                )
+            # Only try to update chart if chart tags are available
+            if 'chart_tags' in globals() and chart_tags and all(chart_tags.values()):
+                if not tag.stock_data.is_cache_valid():
+                    fetch_stock_data(
+                        symbol,
+                        chart_tags['line_tag'],
+                        chart_tags['x_axis_tag'],
+                        chart_tags['y_axis_tag'],
+                        chart_tags['plot_tag']
+                    )
+                else:
+                    tag.load_chart_from_cache()
             else:
-                print(f"📶 Using cached data for {symbol}")
-                # Load chart from cache
-                tag.load_chart_from_cache()
+                print(f"📋 Created stock tag for {symbol} (no chart update)")
         
     except Exception as e:
         print(f"❌ Error adding stock: {e}")
-    
+        
 def clear_table_rows(table_tag):
     """Clear all rows from a table while keeping headers"""
     if dpg.does_item_exist(table_tag):

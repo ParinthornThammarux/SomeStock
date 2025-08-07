@@ -8,7 +8,7 @@ from components.user.user_login import create_user_login_content
 from pages.welcome_page import create_welcome_content
 from pages.example_page_b import create_example_page_b_content
 from components.graph.graph_dpg import create_main_graph
-from containers.container_graph_tabs import create_graph_tabs
+from containers.container_graph_indicators import create_graph_indicators
 
 # Global variable to track current page
 current_page = "welcome"
@@ -60,9 +60,9 @@ def show_page(page_name):
             create_hailun_content("page_content_container")
             current_page = "hailun"
             print("Loaded indicator page content")
-        case "page_b":
-            create_graph_tabs("page_content_container")
-            current_page = "page_b"
+        case "analysis":
+            create_graph_indicators("page_content_container")
+            current_page = "analysis"
             print("Loaded page B content")
         case "user_create":
             current_page = "user_create"

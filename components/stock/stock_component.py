@@ -188,7 +188,7 @@ class StockTag:
         # Create the visual component
         self.create_visual_component()
         self.set_focus(True)
-        
+        self.update_cache_indicator() 
         # Add to global tracking
         _active_tags.append(self)
     
@@ -224,9 +224,9 @@ class StockTag:
     
     def _create_symbol_text(self, text_color):
         """Create the stock symbol text with cache indicator"""
-        cache_indicator = "Fresh" if self.stock_data.is_cache_valid() else "Stale"
-        
+        display_text = f"{self.symbol}"
         dpg.add_text( 
+            display_text,
             pos=[5, 5], 
             color=text_color, 
             tag=f"{self.tag_id}_text"
@@ -429,7 +429,7 @@ class StockTag:
             else:
                 print(f"📦 Using cached data for {self.symbol}")
                 self.load_chart_from_cache()
-
+                
     def _on_heart_clicked(self):
         """Handle heart button click"""
         self.toggle_favorite()
@@ -673,6 +673,7 @@ def refresh_all_tags():
     print(f"🔄 Refreshing {len(_active_tags)} stock tags...")
     for tag in _active_tags:
         tag.refresh_data()
+
 
 # Initialize cache on module load
 load_cache_from_file()

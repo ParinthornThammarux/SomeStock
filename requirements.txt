@@ -7,6 +7,8 @@ numpy>=1.24.0
 matplotlib>=3.7.0
 plotly>=5.17.0
 kaleido>=0.2.1
+ta-lib @ file://./ta_lib-0.6.4-cp311-cp311-win_amd64.whl#sha256=c1af5af76638dd4db2121529b2b022e62992b14ce8a5acac9277f099adc97022threadpoolctl==3.6.0
+
 
 # Web Scraping and HTML Parsing
 beautifulsoup4>=4.12.0

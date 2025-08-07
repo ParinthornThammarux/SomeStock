@@ -8,6 +8,7 @@ import pandas as pd
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from components.stock.stock_data_manager import restore_tags_to_container
 
 from utils import constants
 from utils.stock_fetch_layer import fetch_stock_data
@@ -79,6 +80,7 @@ def create_main_graph(parent_tag, timestamp=None):
         with dpg.group(horizontal=True):
             with dpg.group(horizontal=True, tag='tags_container'):
                 dpg.add_spacer(width=-1)
+            restore_tags_to_container('tags_container')
             with dpg.group(horizontal=True):
                 # Create themes with unique tags
                 green_theme_tag = f"green_button_theme_{timestamp}"
@@ -168,11 +170,12 @@ def plus_button_callback():
     """Open stock search dialog"""
     print("Plus button clicked!")
     create_stock_search(
-        current_stock_line_tag,
-        current_x_axis_tag,
-        current_y_axis_tag,
-        current_plot_tag
-    )
+    mode="chart",
+    line_tag=current_stock_line_tag,
+    x_axis_tag=current_x_axis_tag,
+    y_axis_tag=current_y_axis_tag,
+    plot_tag=current_plot_tag
+)
 
 def fav_button_callback():
     """Heart button callback"""
@@ -464,3 +467,4 @@ def go_to_welcome():
 def create_graph_table_page(parent_tag):
     """Legacy function - redirects to new system"""
     return create_main_graph(parent_tag)
+

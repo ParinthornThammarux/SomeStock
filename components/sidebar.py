@@ -39,7 +39,7 @@ def create_sidebar(parent_tag, toggle_callback, initial_width=constants.EXPANDED
                 dpg.add_button(label=constants.ICON_HOME, width=-1, callback=lambda: show_page("enhanced"), tag="dashboard_icon_btn")
                 dpg.bind_item_font("dashboard_icon_btn", constants.font_awesome_icon_font_id)
 
-                dpg.add_button(label=constants.ICON_SEARCH, width=-1, callback=lambda: show_page("page_b"), tag="search_icon_btn")
+                dpg.add_button(label=constants.ICON_SEARCH_DOLLAR, width=-1, callback=lambda: show_page("analysis"), tag="search_icon_btn")
                 dpg.bind_item_font("search_icon_btn", constants.font_awesome_icon_font_id)
 
                 dpg.add_button(label=constants.ICON_CHART_BAR, width=-1, callback=lambda: show_page("welcome"), tag="portfolio_icon_btn")

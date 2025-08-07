@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 VERSION = "v1.1.0 Table loaded and Indicator imported"
-
+DEBUG = True
 # --- Font Awesome Icon Setup ---
 # IMPORTANT: You need the Font Awesome Free font file 'fa-solid-900.ttf'.
 # Place it in the root directory of your project (your_project_folder/).
@@ -143,6 +143,7 @@ ICON_KEY = "\uf084"         # Key
 ICON_LOCK = "\uf023"        # Lock (closed)
 ICON_UNLOCK = "\uf09c"      # Lock (open)
 ICON_SHIELD = "\uf132"      # Shield (security)
+ICON_SEARCH_DOLLAR = "\uf688"    # Magnifying glass with dollar (financial analysis)
 
 # === LAYOUT & ORGANIZATION ===
 ICON_TH = "\uf00a"          # Grid (3x3)
