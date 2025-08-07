@@ -115,7 +115,39 @@ def load_scaler(symbol):
         scaler.fit(np.array([[0], [max_val.item()]]))
         return scaler
     return None
+#test linear regression
+def liner_regression(symbol, window_size=10, plot=True):
+    df = fetch_data(symbol)
+    close_prices = df["Close"].values.reshape(-1, 1)
 
+    scaler = load_scaler(symbol)
+    if scaler is None:
+        scaler = MinMaxScaler()
+        close_prices = scaler.fit_transform(close_prices).flatten()
+    else:
+        close_prices = scaler.transform(close_prices).flatten()
+
+    x = np.arange(len(close_prices)).reshape(-1, 1)
+    y = close_prices
+
+    model = LinearRegression()
+    model.fit(x, y)
+
+    y_pred = model.predict(x)
+
+    if plot:
+        plt.figure(figsize=(12, 6))
+        plt.plot(df['Date'], y, label='Actual Price')
+        plt.plot(df['Date'], y_pred, label='Linear Regression', linestyle='--')
+        plt.title(f"{symbol} - Linear Regression")
+        plt.xlabel("Date")
+        plt.ylabel("Price")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+
+    return model
 # ==================== Price Prediction ====================
 def predict_next_price(symbol, window_size=10, plot=True):
     df = fetch_data(symbol)
