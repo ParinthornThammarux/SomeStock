@@ -412,6 +412,11 @@ class StockTag:
         # Call callback if provided
         if self.on_remove:
             self.on_remove(self.symbol)
+        try:
+            from containers.container_graph_indicators import indicator_activation
+            indicator_activation()
+        except ImportError:
+            pass
     
     # Event handlers
     def _on_chart_clicked(self):

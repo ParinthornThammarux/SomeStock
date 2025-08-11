@@ -308,4 +308,4 @@ def fav_button_callback():
 
 def create_graph_table_page(parent_tag):
     """Legacy function - redirects to new system"""
-    return create_main_graph(parent_tag)
+    return create_main_rsi_graph(parent_tag)

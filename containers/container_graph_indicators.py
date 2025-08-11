@@ -20,15 +20,13 @@ from components.graph.graph_sankey import create_sankey_tab
 from components.graph.graph_rsi import create_main_rsi_graph
 
 # Global variables
-current_stock_line_tag = None
 matplotlib_helper = None
 plotly_helper = None
-enabled_indicators = []
-current_selected_stock = None
+active_indicator_buttons = set()
 
 def create_graph_indicators(parent_tag):
     """
-    Enhanced version of main graph page with advanced chart options
+    container for showing multiple graph indicator types
     """
     global matplotlib_helper, plotly_helper
     
@@ -55,7 +53,7 @@ def create_graph_indicators(parent_tag):
         dpg.delete_item(main_container_tag)
     
     try:
-        # Create a main container with tabs for different chart types
+        create_indicator_button_themes()
         with dpg.child_window(
             width=-1, 
             height=-1, 
@@ -79,7 +77,7 @@ def create_graph_indicators(parent_tag):
                         dpg.add_spacer(width=-1)
                 restore_tags_to_container('stock_tags_container')
                 
-                indicator_activation()
+
                     
                 with dpg.group(horizontal=True):
                     # Create themes with unique tags
@@ -120,15 +118,25 @@ def create_graph_indicators(parent_tag):
             dpg.add_separator()
             dpg.add_spacer(height=10)
             
+            with dpg.group(indent=10):
+                dpg.add_text("Step 1 : Choose active stocks", tag="hint_1")
+                dpg.add_text("Step 2 : Pick indicators", tag="hint_2")
+                
             with dpg.group(tag="group_indicators",horizontal=True,indent=5):
-                dpg.add_button(tag="rsi_button",label="RSI")
+                dpg.add_button(tag="rsi_button",label="RSI",callback=lambda:run_rsi_analysis("test"))
                 dpg.add_button(tag="price_button",label="PRICE")
                 dpg.add_button(tag="linear_price_button",label="LINEAR REGRESSION PRICE")
 
+            dpg.bind_item_theme("rsi_button", "indicator_button_inactive_theme")
+            dpg.bind_item_theme("price_button", "indicator_button_inactive_theme")
+            dpg.bind_item_theme("linear_price_button", "indicator_button_inactive_theme")
+            
+            #Set initial state
+            indicator_activation()
 
             # Create tab bar for different chart types
             with dpg.tab_bar(tag=chart_tabs_tag,indent=50,):
-                print("created empty tab bar")
+                print("📈 created empty tab bar")
                 # # Tab 1: rsi_graph testing for pun
                 # with dpg.tab(label="RSI Charts", tag=f"dpg_tab_{timestamp}") as dpg_tab:
                 #     try:
@@ -167,7 +175,72 @@ def create_graph_indicators(parent_tag):
         # Fallback to simple content
         dpg.add_text("Error loading enhanced charts", parent=parent_tag, color=[255, 0, 0])
         dpg.add_text(f"Error details: {str(e)}", parent=parent_tag, color=[255, 100, 100])
+
+def create_indicator_button_themes():
+    """Create themes for active/inactive indicator buttons"""
     
+    # Inactive theme (grey background, white text)
+    if not dpg.does_item_exist("indicator_button_inactive_theme"):
+        with dpg.theme(tag="indicator_button_inactive_theme"):
+            with dpg.theme_component(dpg.mvButton):
+                dpg.add_theme_color(dpg.mvThemeCol_Button, [100, 100, 100, 255])           # Grey background
+                dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, [120, 120, 120, 255])    # Lighter grey on hover
+                dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, [80, 80, 80, 255])        # Darker grey when clicked
+                dpg.add_theme_color(dpg.mvThemeCol_Text, [255, 255, 255, 255])             # White text
+    
+    # Active theme (green background, white text)
+    if not dpg.does_item_exist("indicator_button_active_theme"):
+        with dpg.theme(tag="indicator_button_active_theme"):
+            with dpg.theme_component(dpg.mvButton):
+                dpg.add_theme_color(dpg.mvThemeCol_Button, [0, 150, 0, 255])               # Green background
+                dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, [0, 180, 0, 255])        # Brighter green on hover
+                dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, [0, 120, 0, 255])         # Darker green when clicked
+                dpg.add_theme_color(dpg.mvThemeCol_Text, [255, 255, 255, 255])    
+       
+def toggle_indicator_button(button_tag):
+    """Toggle indicator button between active/inactive state"""
+    global active_indicator_buttons
+        
+    button_label = dpg.get_item_label(button_tag)
+    
+    if button_tag in active_indicator_buttons:
+        # Button is active, make it inactive
+        active_indicator_buttons.remove(button_tag)
+        dpg.bind_item_theme(button_tag, "indicator_button_inactive_theme")
+        print(f"🔘 {button_label} deactivated")
+    else:
+        # Button is inactive, make it active
+        active_indicator_buttons.add(button_tag)
+        dpg.bind_item_theme(button_tag, "indicator_button_active_theme")
+        print(f"🟢 {button_label} activated")
+    
+    if len(active_indicator_buttons) == 0:
+        dpg.configure_item("hint_2", show =True)
+    else:
+        dpg.configure_item("hint_2", show = False)
+        
+    print(f"📊 Active indicators: {[dpg.get_item_label(tag) for tag in active_indicator_buttons]}")
+
+def reset_all_indicator_buttons():
+    """Reset all indicator buttons to inactive state"""
+    global active_indicator_buttons
+    
+    if dpg.does_item_exist('group_indicators'):
+        children = dpg.get_item_children('group_indicators', slot=1)
+        if children:
+            for child in children:
+                if dpg.get_item_type(child) == "mvAppItemType::mvButton":
+                    dpg.bind_item_theme(child, "indicator_button_inactive_theme")
+                    button_label = dpg.get_item_label(child)
+                    print(f"🔘 Reset {button_label} to inactive")
+    
+    active_indicator_buttons.clear()
+    print("🔄 All indicator buttons reset to inactive")
+
+def get_active_indicators():
+    """Get list of currently active indicator button labels"""
+    return [dpg.get_item_label(tag) for tag in active_indicator_buttons if dpg.does_item_exist(tag)]
+
 def plus_button_callback():
     """Open stock search dialog - exact same as graph_dpg.py"""
     print("Plus button clicked!")
@@ -185,12 +258,12 @@ def handle_stock_selection(symbol):
     if constants.DEBUG:
         print(f"📊 Stock selected: {symbol}")
     
-    # Create stock tag in the tags container
     try:
         tag = create_stock_tag(symbol, f"{symbol} Corp.", "stock_tags_container")
         if tag:
             if constants.DEBUG:
                 print(f"✅ Created stock tag for {symbol}")
+            indicator_activation()
         else:
             print(f"❌ Failed to create tag for {symbol}")
     except Exception as e:
@@ -205,32 +278,32 @@ def fav_button_callback():
     print(f"Favorited stocks: {favorites}")
 
 def indicator_activation():
+    """Enable/disable indicator buttons based on whether stock tags exist"""
+    print(f"🔧 indicator_activation() called")
+    
     if dpg.does_item_exist('group_indicators'):
-        tag_count = len(get_all_active_tags())
-        if tag_count > 0:
-            # Loop through all indicator buttons and enable them
-            children = dpg.get_item_children('group_indicators', slot=1)
-            if children:
-                for child in children:
-                    # Check if it's a button
-                    item_type = dpg.get_item_type(child)
-                    if item_type == "mvAppItemType::mvButton":
-                        dpg.configure_item(child, enabled=True)
-                        print(f"✅ Enabled button: {dpg.get_item_label(child)}")
-           
+        has_stocks = len(get_all_active_tags()) > 0
+        print(f"📊 Active stock tags count: {len(get_all_active_tags())}")
+        print(f"🔘 Has stocks: {has_stocks}")
+        
+        dpg.configure_item("hint_1", show= not has_stocks)
+        
+        if len(active_indicator_buttons) == 0:
+            dpg.configure_item("hint_2", show= has_stocks)
         else:
-            # Disable all indicator buttons when no tags
-            children = dpg.get_item_children('group_indicators', slot=1)
-            if children:
-                for child in children:
-                    item_type = dpg.get_item_type(child)
-                    if item_type == "mvAppItemType::mvButton":
-                        dpg.configure_item(child, enabled=False)
-                        print(f"❌ Disabled button: {dpg.get_item_label(child)}")
+            dpg.configure_item("hint_2", show= False)
+
+        
+        # Show/hide the entire group
+        dpg.configure_item('group_indicators', show=has_stocks)
+        
+        # Reset buttons to inactive when no stocks
+        if not has_stocks:
+            reset_all_indicator_buttons()
+        
+        print(f"{'👁️' if has_stocks else '🙈'} Group indicators {'shown' if has_stocks else 'hidden'}")
     else:
-        print("group_indicators is not accessable")
-
-
+        print("❌ group_indicators does not exist")
 
 def run_analysis_on_focused_stock(analysis_type):
     """Run analysis on the currently focused stock"""
@@ -251,6 +324,7 @@ def run_analysis_on_focused_stock(analysis_type):
         print("❌ No stock selected. Please click on a stock tag first.")
 
 def run_rsi_analysis(symbol):
+    toggle_indicator_button("rsi_button")
     """Run RSI analysis on specified stock"""
     print(f"📈 Running RSI analysis for {symbol}")
     # Add your RSI analysis code here
