@@ -306,30 +306,6 @@ def detect_hammer(symbol, plot=True):
     print(f"🔨 {symbol} - Detected Hammer on dates: {[str(d.date()) for d in dates.tolist()]}")
     return dates.tolist()
 
-# ==================== Polynomial Regression ====================
-def polynomial_regression(symbol, degree=3, plot=True):
-    df = fetch_data(symbol)
-    x = np.arange(len(df)).reshape(-1, 1)
-    y = df['Close'].values
-
-    poly_features = np.vander(x.flatten(), degree + 1)
-    model = LinearRegression()
-    model.fit(poly_features, y)
-    y_pred = model.predict(poly_features)
-
-    if plot:
-        plt.figure(figsize=(12, 6))
-        plt.plot(df['Date'], y, label='Actual Price')
-        plt.plot(df['Date'], y_pred, label=f'Polynomial Regression (deg {degree})', linestyle='--')
-        plt.title(f"{symbol} - Polynomial Regression Degree {degree}")
-        plt.xlabel("Date")
-        plt.ylabel("Price")
-        plt.legend()
-        plt.grid(True)
-        plt.tight_layout()
-        plt.show()
-
-    return y_pred
 
 # ==================== Aroon Indicator ====================
 def aroon_indicator(symbol, period=14, plot=True):

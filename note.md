@@ -32,3 +32,4 @@ requir lib
 
 **Current Issue**
 1. slow peg ratio
+2. Invalid predict next close price
