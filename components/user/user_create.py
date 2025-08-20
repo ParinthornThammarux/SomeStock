@@ -10,7 +10,14 @@ import time
 from utils import constants
 
 def create_base_user():
-    file_path = "registered_users/base_user.json"
+    # Check if directory exists first, create if not
+    users_dir = "registered_users"
+    if not os.path.exists(users_dir):
+        os.makedirs(users_dir)
+        print(f"Created directory: {users_dir}")
+    
+    file_path = os.path.join(users_dir, "base_user.json")
+    
     if os.path.exists(file_path):
         print("Base user exists, skipping creation.")
     else:
@@ -24,6 +31,7 @@ def create_base_user():
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(base_user, f, indent=2, ensure_ascii=False)
         print(f"Base user created at {file_path}")
+    
     constants.Cur_User = "Base"
     dpg.set_value("user_welcome_message", "Base")
         
