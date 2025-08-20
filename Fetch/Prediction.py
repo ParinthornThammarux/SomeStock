@@ -189,6 +189,7 @@ def predict_rsi(symbol, plot=True):
 
     latest_rsi = data['RSI'].iloc[-1]
     print(f"📈 {symbol} - Latest RSI: {latest_rsi:.2f}")
+    print(f"📊 {symbol} - RSI Interpretation: {'Overbought' if latest_rsi > 70 else 'Oversold' if latest_rsi < 30 else 'Neutral'}")
 
     if plot:
         plt.figure(figsize=(10, 5))
