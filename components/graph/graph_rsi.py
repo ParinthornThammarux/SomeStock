@@ -1,6 +1,5 @@
 # components/graph/graph_rsi.py
 
-# Replace the existing imports with:
 import dearpygui.dearpygui as dpg
 import numpy as np
 import pandas as pd
@@ -405,23 +404,6 @@ def create_rsi_analysis_summary(parent_tag, symbols):
     except Exception as e:
         print(f"❌ Error creating RSI summary: {e}")
         return None
-
-# Legacy compatibility function
-def create_main_rsi_graph(parent_tag, timestamp=None):
-    """
-    Legacy function for backward compatibility
-    Creates a simple RSI chart container
-    """
-    try:
-        with dpg.child_window(width=-1, height=-1, parent=parent_tag, border=False):
-            dpg.add_text("RSI Analysis", color=[200, 200, 255])
-            dpg.add_separator()
-            dpg.add_spacer(height=10)
-            dpg.add_text("Use the indicator buttons above to create RSI charts for selected stocks.", 
-                        color=[150, 150, 150])
-            
-    except Exception as e:
-        print(f"❌ Error creating legacy RSI graph: {e}")
 
 # Utility functions for external access
 def get_rsi_for_symbol(symbol, period=14):

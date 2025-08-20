@@ -1,7 +1,6 @@
 # containers/graph_tabs_container.py
 
 # This acts as a container for all the graph types tabs 
-
 import dearpygui.dearpygui as dpg
 import random
 import time
@@ -13,11 +12,8 @@ from utils.matplotlib_integration import DPGMatplotlibIntegration
 from utils.plotly_integration import PlotlyInteractiveIntegration
 
 # Import them from relative files
-from components.graph.graph_dpg import create_main_graph
-from components.graph.graph_advanced import create_advanced_analysis_tab
-from components.graph.graph_interactive import create_interactive_tab
-from components.graph.graph_sankey import create_sankey_tab
-from components.graph.graph_rsi import create_main_rsi_graph, create_rsi_chart_for_stock
+from components.graph.graph_price import create_price_chart_for_stock
+from components.graph.graph_rsi import create_rsi_chart_for_stock
 
 # Global variables
 matplotlib_helper = None
@@ -269,8 +265,7 @@ def populate_chart_tabs():
                         if button_label == "RSI":
                             create_rsi_chart_for_stock(f"{button_label.lower()}_charts_container", symbol)
                         elif button_label == "PRICE":
-                            dpg.add_text(f"Price analysis for {symbol}", 
-                                        color=[150, 255, 200])
+                            create_price_chart_for_stock(f"{button_label.lower()}_charts_container", symbol)
                         elif button_label == "LINEAR REGRESSION PRICE":
                             dpg.add_text(f"Linear regression for {symbol}", 
                                         color=[255, 200, 150])

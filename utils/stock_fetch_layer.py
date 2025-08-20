@@ -2,8 +2,6 @@
 
 import dearpygui.dearpygui as dpg
 import time
-import random
-import requests
 import pandas as pd
 from utils import constants
 import threading
