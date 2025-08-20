@@ -12,7 +12,7 @@ from utils.matplotlib_integration import DPGMatplotlibIntegration
 from utils.plotly_integration import PlotlyInteractiveIntegration
 
 # Import them from relative files
-from components.graph.Indicator_Price import create_price_chart_for_stock
+from Indicator.Indicator_PRICE import create_price_chart_for_stock
 from Indicator.Indicator_RSI import create_rsi_chart_for_stock
 
 # Global variables

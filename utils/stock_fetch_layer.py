@@ -23,11 +23,12 @@ last_request_time = 0
 request_count = 0
 active_fetches = {}  # {symbol: {'stop_flag': threading.Event(), 'result': None}}
 
+
 # =============================================================================
 # MAIN ENTRY POINT
 # =============================================================================
 
-def fetch_stock_data(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag):
+def fetch_stock_data(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag, period="1d", interval="5m"):
     """
     Unified fetch - gets ALL data from each source in a single call
     """
@@ -59,7 +60,7 @@ def fetch_stock_data(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag):
         # Submit all fetch tasks
         future_to_source = {}
         for source_name, fetch_function in sources:
-            future = executor.submit(fetch_function, symbol, stop_flag)
+            future = executor.submit(fetch_function, symbol, period, interval, stop_flag)
             future_to_source[future] = source_name
         
         print(f"🚀 Started {len(sources)} unified fetches for {symbol}")
@@ -105,7 +106,7 @@ def fetch_stock_data(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag):
 # UNIFIED FETCH FUNCTIONS
 # =============================================================================
 
-def _fetch_yfinance_complete(symbol, stop_flag):
+def _fetch_yfinance_complete(symbol, yperiod, yinterval, stop_flag):
     """Fetch complete data from yfinance in one call"""
     if stop_flag.is_set():
         return None
@@ -122,7 +123,7 @@ def _fetch_yfinance_complete(symbol, stop_flag):
         
         # Get price data
         print(f"🔄 Getting price history for {symbol}")
-        hist = ticker.history(period="1d", interval="5m")
+        hist = ticker.history(period=yperiod, interval=yinterval)
         
         if stop_flag.is_set():
             return None
@@ -208,7 +209,7 @@ def _fetch_yfinance_complete(symbol, stop_flag):
         print(f"❌ yfinance complete error for {symbol}: {e}")
         return None
 
-def _fetch_yahoo_complete(symbol, stop_flag):
+def _fetch_yahoo_complete(symbol, yperiod, yinterval, stop_flag):
     """Fetch complete data from Yahoo using yahooquery for comprehensive data"""
     if stop_flag.is_set():
         return None
@@ -227,7 +228,7 @@ def _fetch_yahoo_complete(symbol, stop_flag):
         print(f"🔄 Getting comprehensive data for {symbol}")
         
         # Get price history
-        hist = ticker.history(period="1d", interval="5m")
+        hist = ticker.history(period=yperiod, interval=yinterval)
         
         if stop_flag.is_set():
             return None
@@ -363,76 +364,7 @@ def _fetch_yahoo_complete(symbol, stop_flag):
         print(f"❌ yahooquery error for {symbol}: {e}")
         return None
 
-def _parse_yahoo_comprehensive_fundamentals(data):
-    """Parse comprehensive Yahoo fundamentals response"""
-    try:
-        fundamentals = {}
-        
-        if 'quoteSummary' in data and data['quoteSummary']['result']:
-            result = data['quoteSummary']['result'][0]
-            
-            # Financial data
-            if 'financialData' in result and result['financialData']:
-                fd = result['financialData']
-                
-                if 'totalRevenue' in fd and fd['totalRevenue']:
-                    fundamentals['revenue'] = _format_yahoo_value(fd['totalRevenue'])
-                
-                if 'operatingCashflow' in fd and fd['operatingCashflow']:
-                    fundamentals['cash_flow'] = _format_yahoo_value(fd['operatingCashflow'])
-                
-                if 'freeCashflow' in fd and fd['freeCashflow']:
-                    fundamentals['free_cash_flow'] = _format_yahoo_value(fd['freeCashflow'])
-            
-            # Summary detail
-            if 'summaryDetail' in result and result['summaryDetail']:
-                sd = result['summaryDetail']
-                
-                if 'marketCap' in sd and sd['marketCap']:
-                    fundamentals['market_cap'] = _format_yahoo_value(sd['marketCap'])
-                
-                if 'trailingPE' in sd and sd['trailingPE']:
-                    fundamentals['pe_ratio'] = sd['trailingPE'].get('raw') if isinstance(sd['trailingPE'], dict) else sd['trailingPE']
-                
-                if 'volume' in sd and sd['volume']:
-                    fundamentals['volume'] = sd['volume'].get('raw') if isinstance(sd['volume'], dict) else sd['volume']
-                
-                if 'averageVolume' in sd and sd['averageVolume']:
-                    fundamentals['avg_volume'] = sd['averageVolume'].get('raw') if isinstance(sd['averageVolume'], dict) else sd['averageVolume']
-            
-            # Asset profile
-            if 'assetProfile' in result and result['assetProfile']:
-                ap = result['assetProfile']
-                
-                if 'longName' in ap and ap['longName']:
-                    fundamentals['company_name'] = ap['longName']
-                
-                if 'industry' in ap and ap['industry']:
-                    fundamentals['industry'] = ap['industry']
-                
-                if 'sector' in ap and ap['sector']:
-                    fundamentals['sector'] = ap['sector']
-            
-            # Income statement history
-            if 'incomeStatementHistory' in result and result['incomeStatementHistory']:
-                try:
-                    income_history = result['incomeStatementHistory']['incomeStatementHistory']
-                    if income_history and len(income_history) > 0:
-                        latest_income = income_history[0]  # Most recent
-                        
-                        if 'netIncome' in latest_income and latest_income['netIncome']:
-                            fundamentals['net_income'] = _format_yahoo_value(latest_income['netIncome'])
-                        elif 'netIncomeToCommon' in latest_income and latest_income['netIncomeToCommon']:
-                            fundamentals['net_income'] = _format_yahoo_value(latest_income['netIncomeToCommon'])
-                except Exception:
-                    pass
-        
-        return fundamentals
-        
-    except Exception as e:
-        print(f"❌ Error parsing comprehensive Yahoo fundamentals: {e}")
-        return {}
-def _fetch_stockdex_complete(symbol, stop_flag):
+def _fetch_stockdex_complete(symbol, yperiod, yinterval, stop_flag):
     """Fetch complete data from stockdx in one call"""
     if stop_flag.is_set():
         return None
@@ -448,7 +380,10 @@ def _fetch_stockdex_complete(symbol, stop_flag):
         
         # Get price data
         print(f"🔄 Getting stockdx price data for {symbol}")
-        df = ticker.yahoo_api_price(range='1d', dataGranularity='5m')
+        
+        stockdx_interval = "1h" if yinterval == "60m" else yinterval
+        
+        df = ticker.yahoo_api_price(range=yperiod, dataGranularity=stockdx_interval)
         
         if stop_flag.is_set():
             return None

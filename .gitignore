@@ -198,3 +198,4 @@ cython_debug/
 
 registered_users/
 registered_users/*
+cache
