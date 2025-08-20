@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import time
 import threading
+import talib
 
 from utils.stock_fetch_layer import fetch_stock_data
 from components.stock.stock_data_manager import get_cached_stock_data, find_tag_by_symbol
@@ -143,12 +144,11 @@ def _wait_for_cache_and_process_rsi(symbol, line_tag, x_axis_tag, y_axis_tag, pl
         if dpg.does_item_exist(status_tag):
             dpg.set_value(status_tag, "Cache error")
             dpg.configure_item(status_tag, color=[255, 100, 100])
-
 def _process_rsi_data(price_df, symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag, status_tag):
-    """Process the cached price data to calculate and display RSI"""
+    """Process the cached price data to calculate and display RSI using TA-Lib"""
     try:
         if dpg.does_item_exist(status_tag):
-            dpg.set_value(status_tag, "Calculating RSI...")
+            dpg.set_value(status_tag, "Calculating RSI with TA-Lib...")
         
         # Get close prices from the DataFrame
         if 'close' not in price_df.columns:
@@ -167,8 +167,8 @@ def _process_rsi_data(price_df, symbol, line_tag, x_axis_tag, y_axis_tag, plot_t
                 dpg.configure_item(status_tag, color=[255, 100, 100])
             return
         
-        # Calculate RSI
-        rsi_data = _calculate_rsi_manual(close_prices, period=14)
+        # Calculate RSI using TA-Lib
+        rsi_data = _calculate_rsi_talib(close_prices, period=14)
         
         if rsi_data is None or len(rsi_data) == 0:
             if dpg.does_item_exist(status_tag):
@@ -183,7 +183,7 @@ def _process_rsi_data(price_df, symbol, line_tag, x_axis_tag, y_axis_tag, plot_t
         # Get latest RSI value for display
         latest_rsi = rsi_data[-1] if len(rsi_data) > 0 else 0
         
-        # Update the RSI plot (not the main price plot)
+        # Update the RSI plot
         if dpg.does_item_exist(line_tag):
             dpg.set_value(line_tag, [x_data, y_data])
         
@@ -199,35 +199,74 @@ def _process_rsi_data(price_df, symbol, line_tag, x_axis_tag, y_axis_tag, plot_t
         # Update status with current RSI value and interpretation
         rsi_status, rsi_color = _get_rsi_interpretation(latest_rsi)
         if dpg.does_item_exist(status_tag):
-            dpg.set_value(status_tag, f"RSI: {latest_rsi:.1f} ({rsi_status})")
+            dpg.set_value(status_tag, f"RSI: {latest_rsi:.1f} ({rsi_status}) [TA-Lib]")
             dpg.configure_item(status_tag, color=rsi_color)
         
-        print(f"✅ RSI chart updated for {symbol} - Latest RSI: {latest_rsi:.2f} ({rsi_status})")
+        print(f"✅ RSI chart updated for {symbol} using TA-Lib - Latest RSI: {latest_rsi:.2f} ({rsi_status})")
         
     except Exception as e:
         print(f"❌ Error processing RSI data for {symbol}: {e}")
         if dpg.does_item_exist(status_tag):
             dpg.set_value(status_tag, f"Processing error")
             dpg.configure_item(status_tag, color=[255, 100, 100])
-
-def _calculate_rsi_manual(prices, period=14):
+            
+def _calculate_rsi_talib(prices, period=14):
     """
-    Calculate RSI manually without requiring TA-Lib
+    Calculate RSI using TA-Lib library
     
     Args:
-        prices: Pandas Series of closing prices
+        prices: Pandas Series or numpy array of closing prices
         period: RSI period (default 14)
     
     Returns:
         Numpy array of RSI values
     """
     try:
+        # Convert to numpy array if it's a pandas Series
+        if isinstance(prices, pd.Series):
+            prices_array = prices.values
+        else:
+            prices_array = np.array(prices)
+        
+        if len(prices_array) < period + 1:
+            print(f"⚠️ Insufficient data for RSI calculation (need {period + 1}, got {len(prices_array)})")
+            return None
+        
+        # Calculate RSI using TA-Lib
+        rsi_values = talib.RSI(prices_array, timeperiod=period)
+        
+        # Remove NaN values (first 'period' values will be NaN)
+        valid_rsi = rsi_values[~np.isnan(rsi_values)]
+        
+        if len(valid_rsi) == 0:
+            print(f"❌ No valid RSI values calculated for {len(prices_array)} price points")
+            return None
+        
+        print(f"✅ RSI calculated using TA-Lib: {len(valid_rsi)} values, range: {valid_rsi.min():.1f}-{valid_rsi.max():.1f}")
+        return valid_rsi
+        
+    except ImportError:
+        print("❌ TA-Lib not available, falling back to manual calculation")
+        return _calculate_rsi_manual_fallback(prices, period)
+    except Exception as e:
+        print(f"❌ Error calculating RSI with TA-Lib: {e}")
+        return _calculate_rsi_manual_fallback(prices, period)
+
+def _calculate_rsi_manual_fallback(prices, period=14):
+    """
+    Fallback manual RSI calculation when TA-Lib is not available
+    """
+    try:
+        print("🔄 Using manual RSI calculation as fallback")
+        
+        if isinstance(prices, pd.Series):
+            prices = prices.values
+        else:
+            prices = np.array(prices)
+        
         if len(prices) < period + 1:
             print(f"⚠️ Insufficient data for RSI calculation (need {period + 1}, got {len(prices)})")
             return None
-        
-        # Convert to numpy array
-        prices = np.array(prices)
         
         # Calculate price differences
         deltas = np.diff(prices)
@@ -260,13 +299,13 @@ def _calculate_rsi_manual(prices, period=14):
         # Return only valid RSI values (remove NaN)
         valid_rsi = rsi[period:]
         
-        print(f"✅ RSI calculated: {len(valid_rsi)} values, range: {valid_rsi.min():.1f}-{valid_rsi.max():.1f}")
+        print(f"✅ Manual RSI calculated: {len(valid_rsi)} values, range: {valid_rsi.min():.1f}-{valid_rsi.max():.1f}")
         return valid_rsi
         
     except Exception as e:
-        print(f"❌ Error calculating RSI: {e}")
+        print(f"❌ Error in manual RSI calculation: {e}")
         return None
-
+    
 def _add_rsi_reference_lines(y_axis_tag, data_length):
     """Add overbought/oversold reference lines to RSI chart"""
     try:
@@ -387,7 +426,7 @@ def create_main_rsi_graph(parent_tag, timestamp=None):
 # Utility functions for external access
 def get_rsi_for_symbol(symbol, period=14):
     """
-    Get current RSI value for a symbol
+    Get current RSI value for a symbol using TA-Lib
     
     Returns:
         tuple: (rsi_value, interpretation, color)
@@ -395,7 +434,7 @@ def get_rsi_for_symbol(symbol, period=14):
     try:
         stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.")
         if stock_data and stock_data.price_history is not None:
-            rsi_values = _calculate_rsi_manual(stock_data.price_history['close'], period)
+            rsi_values = _calculate_rsi_talib(stock_data.price_history['close'], period)
             if rsi_values is not None and len(rsi_values) > 0:
                 latest_rsi = rsi_values[-1]
                 interpretation, color = _get_rsi_interpretation(latest_rsi)
