@@ -1,311 +1,408 @@
-# components/graph/analysis_graph.py
+# components/graph/graph_rsi.py
 
+# Replace the existing imports with:
 import dearpygui.dearpygui as dpg
-import math
-import random
-import time
-import pandas as pd
-import threading
 import numpy as np
-import yfinance as yf
-import talib
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import pandas as pd
+import time
+import threading
 
-
-from utils import constants
 from utils.stock_fetch_layer import fetch_stock_data
-from components.stock_search import create_stock_search
+from components.stock.stock_data_manager import get_cached_stock_data, find_tag_by_symbol
 
-# Global variables to track current chart components
-current_stock_line_tag = None
-current_x_axis_tag = None
-current_y_axis_tag = None
-current_plot_tag = None
-current_table_tag = None
-
-# Thread lock for table operations
-table_lock = threading.Lock()
-
-def calculate_rsi_talib(data, timeperiod=14):
-    """Calculate RSI using TA-Lib"""
-    rsi = talib.RSI(data['Close'], timeperiod=timeperiod)
-    return rsi
-
-def fetch_and_plot_rsi(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag):
-    """Fetch stock data and plot RSI"""
+def create_rsi_chart_for_stock(parent_tag, symbol, container_height=280):
+    """
+    Create a RSI chart for a specific stock within a container
+    """
     try:
-        print(f"📊 Fetching RSI data for {symbol}")
+        print(f"📊 Creating RSI chart for {symbol}")
         
-        # Fetch data using yfinance
-        ticker = yf.Ticker(symbol)
-        data = ticker.history(period="3mo", interval="1d")  # 3 months daily data
+        # Generate unique tags for this stock's RSI chart
+        timestamp = str(int(time.time() * 1000))
+        chart_container_tag = f"rsi_chart_container_{symbol}_{timestamp}"
+        plot_tag = f"rsi_plot_{symbol}_{timestamp}"
+        x_axis_tag = f"rsi_x_axis_{symbol}_{timestamp}"
+        y_axis_tag = f"rsi_y_axis_{symbol}_{timestamp}"
+        line_tag = f"rsi_line_{symbol}_{timestamp}"
         
-        if data.empty:
-            print(f"❌ No data found for {symbol}")
-            return
-        
-        # Calculate RSI using TA-Lib
-        data['RSI'] = talib.RSI(data['Close'], timeperiod=14)
-        latest_rsi = data['RSI'].iloc[-1]
-
-        # Remove NaN values (first 14 values will be NaN)
-        rsi_clean = data['RSI'].dropna()
-
-        # Prepare data for DPG plot
-        x_data = list(range(len(rsi_clean)))
-        y_data = rsi_clean.tolist()
-
-        print(f"📈 Latest RSI for {symbol}: {latest_rsi:.2f}")
-        
-        # Update the plot
-        dpg.set_value(line_tag, [x_data, y_data])
-        
-        # Set appropriate axis limits for RSI (0-100)
-        dpg.set_axis_limits(x_axis_tag, 0, len(x_data))
-        dpg.set_axis_limits(y_axis_tag, 0, 100)
-        
-        # Clear existing horizontal lines
-        children = dpg.get_item_children(y_axis_tag, 1)
-        if children:
-            for child in children:
-                child_label = dpg.get_item_label(child) if dpg.does_item_exist(child) else ""
-                if "hline" in str(child) or "Overbought" in child_label or "Oversold" in child_label:
-                    try:
-                        dpg.delete_item(child)
-                    except:
-                        pass
-        
-        # Add horizontal reference lines for RSI levels
-        try:
-            # Overbought line at 70
-            overbought_tag = f"hline_70_{int(time.time())}"
-            dpg.add_hline_series([70] * len(x_data), parent=y_axis_tag, 
-                               tag=overbought_tag, label="Overbought (70)")
+        # Create chart container
+        with dpg.child_window(
+            width=-1, 
+            height=container_height, 
+            border=True, 
+            parent=parent_tag,
+            tag=chart_container_tag
+        ):
+            # Chart header with stock info
+            with dpg.group(horizontal=True):
+                dpg.add_text(f"RSI Analysis: {symbol}", color=[255, 255, 255])
+                dpg.add_spacer(width=20)
+                dpg.add_text("Loading...", tag=f"rsi_status_{symbol}_{timestamp}", color=[255, 255, 0])
             
-            # Oversold line at 30
-            oversold_tag = f"hline_30_{int(time.time())}"
-            dpg.add_hline_series([30] * len(x_data), parent=y_axis_tag, 
-                               tag=oversold_tag, label="Oversold (30)")
-        except Exception as e:
-            print(f"⚠️ Could not add reference lines: {e}")
+            dpg.add_separator()
+            dpg.add_spacer(height=5)
+            
+            # Create the RSI plot (separate from price plot)
+            with dpg.plot(
+                label="", 
+                height=-1, 
+                width=-1, 
+                tag=plot_tag
+            ):
+                dpg.add_plot_legend()
+                dpg.add_plot_axis(dpg.mvXAxis, label="Time Period", tag=x_axis_tag)
+                dpg.add_plot_axis(dpg.mvYAxis, label="RSI Value", tag=y_axis_tag)
+                
+                # Initialize empty RSI line series
+                dpg.add_line_series([], [], parent=y_axis_tag, tag=line_tag, label=f"RSI {symbol}")
+                
+                # Set RSI-appropriate axis limits
+                dpg.set_axis_limits(x_axis_tag, 0, 100)
+                dpg.set_axis_limits(y_axis_tag, 0, 100)
         
-        # Update axis labels
-        dpg.configure_item(x_axis_tag, label="Days")
-        dpg.configure_item(y_axis_tag, label="RSI Value")
+        # Start RSI calculation using global fetch system
+        thread = threading.Thread(
+            target=_fetch_and_plot_rsi_async, 
+            args=(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag, f"rsi_status_{symbol}_{timestamp}")
+        )
+        thread.daemon = True
+        thread.start()
         
-        print(f"✅ RSI plot updated for {symbol}")
-
-        if latest_rsi > 70:
-            print(f"🔴 {symbol} is OVERBOUGHT (RSI: {latest_rsi:.2f})")
-        elif latest_rsi < 30:
-            print(f"🟢 {symbol} is OVERSOLD (RSI: {latest_rsi:.2f})")
-        else:
-            print(f"🟡 {symbol} is in NEUTRAL territory (RSI: {latest_rsi:.2f})")
+        return chart_container_tag
         
     except Exception as e:
-        print(f"❌ Error plotting RSI for {symbol}: {e}")
-        import traceback
-        traceback.print_exc()
-
-def rsi_analysis_callback():
-    """Callback for RSI analysis button"""
-    print("📊 RSI Analysis clicked!")
+        print(f"❌ Error creating RSI chart for {symbol}: {e}")
+        return None
     
-    # For proof of concept, use a default symbol - can be made user input later
-    symbol = "AAPL"
-    
-    # Use global chart tags
-    global current_plot_tag, current_x_axis_tag, current_y_axis_tag, current_stock_line_tag
-    
-    if current_stock_line_tag and dpg.does_item_exist(current_stock_line_tag):
-        # Update chart title/label
-        if dpg.does_item_exist(current_plot_tag):
-            try:
-                dpg.configure_item(current_plot_tag, label=f"RSI Analysis - {symbol}")
-            except:
-                pass
+def _fetch_and_plot_rsi_async(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag, status_tag):
+    """Use the stock fetch layer to get stock data and calculate RSI"""
+    try:
+        # Update status
+        if dpg.does_item_exist(status_tag):
+            dpg.set_value(status_tag, "Checking cache...")
+            dpg.configure_item(status_tag, color=[255, 255, 0])
         
-        fetch_and_plot_rsi(symbol, current_stock_line_tag, current_x_axis_tag, 
-                          current_y_axis_tag, current_plot_tag)
+        # Try to get cached data first
+        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.")
+        
+        if stock_data and stock_data.price_history is not None and not stock_data.price_history.empty and stock_data.is_cache_valid():
+            print(f"📦 Using cached data for {symbol} RSI calculation")
+            _process_rsi_data(stock_data.price_history, symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag, status_tag)
+        else:
+            print(f"🔄 Fetching fresh data for {symbol} RSI calculation using global fetch system")
+            
+            # Update status
+            if dpg.does_item_exist(status_tag):
+                dpg.set_value(status_tag, "Fetching fresh data...")
+            
+            # Use the global fetch system - this will update the cache
+            # We'll monitor the cache for updates
+            fetch_stock_data(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag)
+            
+            # Wait for data to be fetched and cached, then process for RSI
+            _wait_for_cache_and_process_rsi(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag, status_tag)
+        
+    except Exception as e:
+        print(f"❌ Error in RSI data fetching for {symbol}: {e}")
+        if dpg.does_item_exist(status_tag):
+            dpg.set_value(status_tag, f"Error: {str(e)[:30]}...")
+            dpg.configure_item(status_tag, color=[255, 100, 100])
+
+def _wait_for_cache_and_process_rsi(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag, status_tag, max_wait=30):
+    """Wait for the global fetch system to update cache, then process RSI"""
+    try:
+        start_time = time.time()
+        
+        while time.time() - start_time < max_wait:
+            # Check if cache has been updated with fresh data
+            stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.")
+            
+            if (stock_data and stock_data.price_history is not None 
+                and not stock_data.price_history.empty 
+                and stock_data.is_cache_valid()):
+                
+                print(f"✅ Cache updated for {symbol}, processing RSI")
+                _process_rsi_data(stock_data.price_history, symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag, status_tag)
+                return
+            
+            # Wait a bit before checking again
+            time.sleep(0.5)
+        
+        # Timeout - try with whatever data we have
+        print(f"⚠️ Timeout waiting for {symbol} data, using available data")
+        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.")
+        if stock_data and stock_data.price_history is not None:
+            _process_rsi_data(stock_data.price_history, symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag, status_tag)
+        else:
+            if dpg.does_item_exist(status_tag):
+                dpg.set_value(status_tag, "No data available")
+                dpg.configure_item(status_tag, color=[255, 100, 100])
+                
+    except Exception as e:
+        print(f"❌ Error waiting for cache update: {e}")
+        if dpg.does_item_exist(status_tag):
+            dpg.set_value(status_tag, "Cache error")
+            dpg.configure_item(status_tag, color=[255, 100, 100])
+
+def _process_rsi_data(price_df, symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag, status_tag):
+    """Process the cached price data to calculate and display RSI"""
+    try:
+        if dpg.does_item_exist(status_tag):
+            dpg.set_value(status_tag, "Calculating RSI...")
+        
+        # Get close prices from the DataFrame
+        if 'close' not in price_df.columns:
+            print(f"❌ No 'close' column in price data for {symbol}")
+            if dpg.does_item_exist(status_tag):
+                dpg.set_value(status_tag, "Invalid price data")
+                dpg.configure_item(status_tag, color=[255, 100, 100])
+            return
+        
+        close_prices = price_df['close'].dropna()
+        
+        if len(close_prices) < 15:  # Need at least 15 points for 14-period RSI
+            print(f"❌ Insufficient price data for {symbol}: {len(close_prices)} points")
+            if dpg.does_item_exist(status_tag):
+                dpg.set_value(status_tag, "Insufficient data")
+                dpg.configure_item(status_tag, color=[255, 100, 100])
+            return
+        
+        # Calculate RSI
+        rsi_data = _calculate_rsi_manual(close_prices, period=14)
+        
+        if rsi_data is None or len(rsi_data) == 0:
+            if dpg.does_item_exist(status_tag):
+                dpg.set_value(status_tag, "RSI calculation failed")
+                dpg.configure_item(status_tag, color=[255, 100, 100])
+            return
+        
+        # Prepare plot data
+        x_data = list(range(len(rsi_data)))
+        y_data = rsi_data.tolist()
+        
+        # Get latest RSI value for display
+        latest_rsi = rsi_data[-1] if len(rsi_data) > 0 else 0
+        
+        # Update the RSI plot (not the main price plot)
+        if dpg.does_item_exist(line_tag):
+            dpg.set_value(line_tag, [x_data, y_data])
+        
+        # Update axis limits for RSI (0-100 range)
+        if dpg.does_item_exist(x_axis_tag):
+            dpg.set_axis_limits(x_axis_tag, 0, len(x_data))
+        if dpg.does_item_exist(y_axis_tag):
+            dpg.set_axis_limits(y_axis_tag, 0, 100)
+        
+        # Add reference lines for overbought/oversold levels
+        _add_rsi_reference_lines(y_axis_tag, len(x_data))
+        
+        # Update status with current RSI value and interpretation
+        rsi_status, rsi_color = _get_rsi_interpretation(latest_rsi)
+        if dpg.does_item_exist(status_tag):
+            dpg.set_value(status_tag, f"RSI: {latest_rsi:.1f} ({rsi_status})")
+            dpg.configure_item(status_tag, color=rsi_color)
+        
+        print(f"✅ RSI chart updated for {symbol} - Latest RSI: {latest_rsi:.2f} ({rsi_status})")
+        
+    except Exception as e:
+        print(f"❌ Error processing RSI data for {symbol}: {e}")
+        if dpg.does_item_exist(status_tag):
+            dpg.set_value(status_tag, f"Processing error")
+            dpg.configure_item(status_tag, color=[255, 100, 100])
+
+def _calculate_rsi_manual(prices, period=14):
+    """
+    Calculate RSI manually without requiring TA-Lib
+    
+    Args:
+        prices: Pandas Series of closing prices
+        period: RSI period (default 14)
+    
+    Returns:
+        Numpy array of RSI values
+    """
+    try:
+        if len(prices) < period + 1:
+            print(f"⚠️ Insufficient data for RSI calculation (need {period + 1}, got {len(prices)})")
+            return None
+        
+        # Convert to numpy array
+        prices = np.array(prices)
+        
+        # Calculate price differences
+        deltas = np.diff(prices)
+        
+        # Separate gains and losses
+        gains = np.where(deltas > 0, deltas, 0)
+        losses = np.where(deltas < 0, -deltas, 0)
+        
+        # Calculate initial averages
+        avg_gain = np.mean(gains[:period])
+        avg_loss = np.mean(losses[:period])
+        
+        # Initialize RSI array
+        rsi = np.zeros(len(prices))
+        rsi[:period] = np.nan  # First 'period' values are NaN
+        
+        # Calculate RSI for each point after the initial period
+        for i in range(period, len(prices)):
+            # Smoothed moving average (Wilder's smoothing)
+            avg_gain = (avg_gain * (period - 1) + gains[i - 1]) / period
+            avg_loss = (avg_loss * (period - 1) + losses[i - 1]) / period
+            
+            # Calculate RS and RSI
+            if avg_loss == 0:
+                rsi[i] = 100
+            else:
+                rs = avg_gain / avg_loss
+                rsi[i] = 100 - (100 / (1 + rs))
+        
+        # Return only valid RSI values (remove NaN)
+        valid_rsi = rsi[period:]
+        
+        print(f"✅ RSI calculated: {len(valid_rsi)} values, range: {valid_rsi.min():.1f}-{valid_rsi.max():.1f}")
+        return valid_rsi
+        
+    except Exception as e:
+        print(f"❌ Error calculating RSI: {e}")
+        return None
+
+def _add_rsi_reference_lines(y_axis_tag, data_length):
+    """Add overbought/oversold reference lines to RSI chart"""
+    try:
+        if not dpg.does_item_exist(y_axis_tag):
+            return
+        
+        # Create timestamp for unique tags
+        timestamp = str(int(time.time() * 1000))
+        
+        # Overbought line at 70
+        overbought_tag = f"rsi_overbought_{timestamp}"
+        x_values = list(range(data_length))
+        y_values = [70] * data_length
+        
+        dpg.add_line_series(
+            x_values, y_values,
+            parent=y_axis_tag,
+            tag=overbought_tag,
+            label="Overbought (70)"
+        )
+        
+        # Oversold line at 30
+        oversold_tag = f"rsi_oversold_{timestamp}"
+        y_values = [30] * data_length
+        
+        dpg.add_line_series(
+            x_values, y_values,
+            parent=y_axis_tag,
+            tag=oversold_tag,
+            label="Oversold (30)"
+        )
+        
+        # Midline at 50
+        midline_tag = f"rsi_midline_{timestamp}"
+        y_values = [50] * data_length
+        
+        dpg.add_line_series(
+            x_values, y_values,
+            parent=y_axis_tag,
+            tag=midline_tag,
+            label="Midline (50)"
+        )
+        
+    except Exception as e:
+        print(f"⚠️ Could not add RSI reference lines: {e}")
+
+def _get_rsi_interpretation(rsi_value):
+    """Get RSI interpretation and corresponding color"""
+    if rsi_value > 70:
+        return "Overbought", [255, 100, 100]  # Red
+    elif rsi_value < 30:
+        return "Oversold", [100, 255, 100]    # Green
+    elif rsi_value > 50:
+        return "Bullish", [255, 255, 100]     # Yellow
     else:
-        print("❌ Chart components not available")
+        return "Bearish", [255, 200, 100]     # Orange
 
-def reset_chart_callback():
-    """Reset chart to normal price view"""
-    print("🔄 Resetting chart to price view")
+def create_rsi_analysis_summary(parent_tag, symbols):
+    """
+    Create a summary table of RSI values for multiple stocks
     
-    global current_plot_tag, current_x_axis_tag, current_y_axis_tag
-    
-    # Reset chart title
-    if dpg.does_item_exist(current_plot_tag):
-        try:
-            dpg.configure_item(current_plot_tag, label="Stock Price Chart")
-        except:
-            pass
-    
-    # Reset axis labels
-    if dpg.does_item_exist(current_x_axis_tag):
-        dpg.configure_item(current_x_axis_tag, label="Days")
-    if dpg.does_item_exist(current_y_axis_tag):
-        dpg.configure_item(current_y_axis_tag, label="Price ($)")
-    
-    # Generate fresh random data for demo
-    refresh_data()
+    Args:
+        parent_tag: Parent container for the summary
+        symbols: List of stock symbols to analyze
+    """
+    try:
+        timestamp = str(int(time.time() * 1000))
+        summary_tag = f"rsi_summary_{timestamp}"
+        
+        with dpg.child_window(
+            width=-1, 
+            height=200, 
+            border=True, 
+            parent=parent_tag,
+            tag=summary_tag
+        ):
+            dpg.add_text("RSI Summary", color=[255, 255, 255])
+            dpg.add_separator()
+            
+            # Create summary table
+            with dpg.table(header_row=True, borders_innerH=True, borders_outerH=True, 
+                          borders_innerV=True, borders_outerV=True):
+                dpg.add_table_column(label="Symbol", width_fixed=True, init_width_or_weight=80)
+                dpg.add_table_column(label="RSI", width_fixed=True, init_width_or_weight=60)
+                dpg.add_table_column(label="Signal", width_fixed=True, init_width_or_weight=100)
+                dpg.add_table_column(label="Status", width_fixed=True, init_width_or_weight=120)
+                
+                for symbol in symbols:
+                    with dpg.table_row():
+                        dpg.add_text(symbol)
+                        dpg.add_text("Calculating...", tag=f"rsi_value_{symbol}_{timestamp}")
+                        dpg.add_text("...", tag=f"rsi_signal_{symbol}_{timestamp}")
+                        dpg.add_text("Loading", tag=f"rsi_status_summary_{symbol}_{timestamp}")
+        
+        return summary_tag
+        
+    except Exception as e:
+        print(f"❌ Error creating RSI summary: {e}")
+        return None
 
+# Legacy compatibility function
 def create_main_rsi_graph(parent_tag, timestamp=None):
     """
-    Creates a content page with a graph on top and technical analysis below.
-    RSI analysis
+    Legacy function for backward compatibility
+    Creates a simple RSI chart container
     """
-    # GLOBAL DECLARATION MUST BE FIRST IN FUNCTION
-    global current_stock_line_tag, current_x_axis_tag, current_y_axis_tag, current_plot_tag, current_table_tag
-    
-    print(f"Creating analysis graph in parent: {parent_tag}")
-    
-    # Create unique identifier for this instance
-    if timestamp is None:
-        timestamp = str(int(time.time() * 1000))
-    
-    # Create a main container with proper height management
-    main_container_tag = f"main_container_{timestamp}"
-    with dpg.child_window(width=-1, height=-1, parent=parent_tag, tag=main_container_tag, no_scrollbar=False):
-
-        # GRAPH SECTION - Fixed height container
-        dpg.add_text("Stock Analysis Chart", color=[200, 200, 255])
-        dpg.add_spacer(height=5)
-        
-        x_data = []
-        y_data = []
-        
-        # Create the plot with unique tags - STORE ALL TAGS GLOBALLY
-        plot_tag = f"plot_{timestamp}"
-        x_axis_tag = f"x_axis_{timestamp}"
-        y_axis_tag = f"y_axis_{timestamp}"
-        line_tag = f"stock_line_{timestamp}"
-        graph_container_tag = f"graph_container_{timestamp}"
-        
-        # Store tags globally for later access
-        current_plot_tag = plot_tag
-        current_x_axis_tag = x_axis_tag
-        current_y_axis_tag = y_axis_tag
-        current_stock_line_tag = line_tag
-        
-        print(f"📋 Created tags - Plot: {plot_tag}, X-axis: {x_axis_tag}, Y-axis: {y_axis_tag}, Line: {line_tag}")
-        
-        # Use a group to contain the plot with specific dimensions
-        with dpg.group():
-            with dpg.child_window(width=-1, height=400, tag=graph_container_tag, border=True):
-                with dpg.plot(label="Stock Price Chart", height=-1, width=-1, tag=plot_tag):
-                    dpg.add_plot_legend()
-                    dpg.add_plot_axis(dpg.mvXAxis, label="Days", tag=x_axis_tag)
-                    dpg.add_plot_axis(dpg.mvYAxis, label="Price ($)", tag=y_axis_tag)
-                    dpg.add_line_series(x_data, y_data, parent=y_axis_tag, tag=line_tag, label="Stock Data")
-                    dpg.set_axis_limits(x_axis_tag, 0, 50)
-                    dpg.set_axis_limits(y_axis_tag, 80, 120)
-
-        # Technical Analysis Section
-        dpg.add_spacer(height=15)
-        dpg.add_text("Technical Analysis Tools", color=[255, 200, 100])
-        dpg.add_separator()
-        dpg.add_spacer(height=10)
-
-        with dpg.group(horizontal=True):
-            # RSI Analysis button
-            dpg.add_button(label="📈 RSI Analysis (AAPL)", callback=rsi_analysis_callback, 
-                          width=180, height=35)
-            dpg.add_spacer(width=15)
-            
-            # Reset Chart button
-            dpg.add_button(label="🔄 Reset to Price Chart", callback=reset_chart_callback, 
-                          width=180, height=35)
-            dpg.add_spacer(width=15)
-            
-            # Stock search button
-            dpg.add_button(label="🔍 Add Stock", callback=plus_button_callback, 
-                          width=120, height=35)
-
-        dpg.add_spacer(height=15)
-
-        # Analysis Info Section
-        with dpg.child_window(width=-1, height=150, border=True):
-            dpg.add_text("Analysis Information", color=[200, 255, 200])
+    try:
+        with dpg.child_window(width=-1, height=-1, parent=parent_tag, border=False):
+            dpg.add_text("RSI Analysis", color=[200, 200, 255])
             dpg.add_separator()
             dpg.add_spacer(height=10)
+            dpg.add_text("Use the indicator buttons above to create RSI charts for selected stocks.", 
+                        color=[150, 150, 150])
             
-            dpg.add_text("RSI (Relative Strength Index) Information:", color=[180, 180, 255])
-            dpg.add_text("• RSI > 70: Potentially Overbought (Consider Selling)", color=[255, 150, 150])
-            dpg.add_text("• RSI < 30: Potentially Oversold (Consider Buying)", color=[150, 255, 150])
-            dpg.add_text("• RSI 30-70: Neutral Territory", color=[255, 255, 150])
-            dpg.add_spacer(height=5)
-            dpg.add_text("Click 'RSI Analysis' to view RSI chart for AAPL", color=[200, 200, 200])
+    except Exception as e:
+        print(f"❌ Error creating legacy RSI graph: {e}")
 
-        dpg.add_spacer(height=20)
+# Utility functions for external access
+def get_rsi_for_symbol(symbol, period=14):
+    """
+    Get current RSI value for a symbol
+    
+    Returns:
+        tuple: (rsi_value, interpretation, color)
+    """
+    try:
+        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.")
+        if stock_data and stock_data.price_history is not None:
+            rsi_values = _calculate_rsi_manual(stock_data.price_history['close'], period)
+            if rsi_values is not None and len(rsi_values) > 0:
+                latest_rsi = rsi_values[-1]
+                interpretation, color = _get_rsi_interpretation(latest_rsi)
+                return latest_rsi, interpretation, color
         
-        # Navigation buttons
-        with dpg.group(horizontal=True):
-            dpg.add_button(label="⬅️ Back to Welcome", callback=go_to_welcome, width=150, height=35)
-            dpg.add_spacer(width=15)
-            dpg.add_button(label="📊 Portfolio View", callback=go_to_portfolio, width=150, height=35)
-
-def plus_button_callback():
-    """Open stock search dialog"""
-    print("Plus button clicked!")
-    create_stock_search(
-        current_stock_line_tag,
-        current_x_axis_tag,
-        current_y_axis_tag,
-        current_plot_tag
-    )
-
-def refresh_data():
-    """Refresh the graph with random data"""
-    global current_stock_line_tag, current_x_axis_tag, current_y_axis_tag
-    
-    print("Refreshing stock data...")
-    
-    # Generate new data
-    x_data = list(range(50))
-    y_data = []
-    base_price = random.uniform(90, 110)
-    for i in range(50):
-        change = random.uniform(-2, 2)
-        base_price += change
-        y_data.append(max(80, min(120, base_price)))
-    
-    # Update the line series using stored tag
-    if current_stock_line_tag and dpg.does_item_exist(current_stock_line_tag):
-        dpg.set_value(current_stock_line_tag, [x_data, y_data])
+        return None, "No Data", [100, 100, 100]
         
-        # Update axis limits using stored tags
-        if current_x_axis_tag and dpg.does_item_exist(current_x_axis_tag):
-            dpg.set_axis_limits(current_x_axis_tag, 0, 50)
-        if current_y_axis_tag and dpg.does_item_exist(current_y_axis_tag):
-            dpg.set_axis_limits(current_y_axis_tag, 80, 120)
-            
-        print("Graph data refreshed!")
-    else:
-        print("Graph not found for refresh")
-
-def go_to_welcome():
-    """Go back to welcome page"""
-    print("Going back to welcome page")
-    from containers.container_content import show_page
-    show_page("welcome")
-
-def go_to_portfolio():
-    """Go to portfolio/enhanced page"""
-    print("Going to portfolio page")
-    from containers.container_content import show_page
-    show_page("enhanced")
-
-# Legacy compatibility functions
-def fav_button_callback():
-    """Heart button callback"""
-    print("Heart button clicked!")
-    from components.stock.stock_data_manager import get_favorited_stocks
-    favorites = get_favorited_stocks()
-    print(f"Favorited stocks: {favorites}")
-
-def create_graph_table_page(parent_tag):
-    """Legacy function - redirects to new system"""
-    return create_main_rsi_graph(parent_tag)
+    except Exception as e:
+        print(f"❌ Error getting RSI for {symbol}: {e}")
+        return None, "Error", [255, 100, 100]

@@ -169,7 +169,7 @@ EXPANDED_WIDTH = 200
 # --- User variables
 Cur_User = None
 favorite_stocks = []
-
+active_indicator_buttons = set()
 # --- Global Font References (will be populated in main_app.py) ---
 default_font_id = None
 font_awesome_icon_font_id = None

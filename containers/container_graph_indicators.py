@@ -17,12 +17,13 @@ from components.graph.graph_dpg import create_main_graph
 from components.graph.graph_advanced import create_advanced_analysis_tab
 from components.graph.graph_interactive import create_interactive_tab
 from components.graph.graph_sankey import create_sankey_tab
-from components.graph.graph_rsi import create_main_rsi_graph
+from components.graph.graph_rsi import create_main_rsi_graph, create_rsi_chart_for_stock
 
 # Global variables
 matplotlib_helper = None
 plotly_helper = None
-active_indicator_buttons = set()
+chart_tabs_tag = None
+from utils.constants import active_indicator_buttons
 
 def create_graph_indicators(parent_tag):
     """
@@ -46,6 +47,7 @@ def create_graph_indicators(parent_tag):
     
     # Create unique tags to avoid conflicts
     main_container_tag = f"enhanced_main_container_{timestamp}"
+    global chart_tabs_tag
     chart_tabs_tag = f"chart_tabs_{timestamp}"
     
     # Check if container already exists and delete it
@@ -122,11 +124,12 @@ def create_graph_indicators(parent_tag):
                 dpg.add_text("Step 1 : Choose active stocks", tag="hint_1")
                 dpg.add_text("Step 2 : Pick indicators", tag="hint_2")
                 
+            # Update the button creation section (around line 92)
             with dpg.group(tag="group_indicators",horizontal=True,indent=5):
-                dpg.add_button(tag="rsi_button",label="RSI",callback=lambda:run_rsi_analysis("test"))
-                dpg.add_button(tag="price_button",label="PRICE")
-                dpg.add_button(tag="linear_price_button",label="LINEAR REGRESSION PRICE")
-
+                dpg.add_button(tag="rsi_button",label="RSI",callback=lambda: toggle_indicator_button("rsi_button"))
+                dpg.add_button(tag="price_button",label="PRICE",callback=lambda: toggle_indicator_button("price_button"))
+                dpg.add_button(tag="linear_price_button",label="LINEAR REGRESSION PRICE",callback=lambda: toggle_indicator_button("linear_price_button"))
+                
             dpg.bind_item_theme("rsi_button", "indicator_button_inactive_theme")
             dpg.bind_item_theme("price_button", "indicator_button_inactive_theme")
             dpg.bind_item_theme("linear_price_button", "indicator_button_inactive_theme")
@@ -135,41 +138,10 @@ def create_graph_indicators(parent_tag):
             indicator_activation()
 
             # Create tab bar for different chart types
-            with dpg.tab_bar(tag=chart_tabs_tag,indent=50,):
+            dpg.add_spacer(height=10)
+            with dpg.tab_bar(tag=chart_tabs_tag,indent=50):
                 print("📈 created empty tab bar")
-                # # Tab 1: rsi_graph testing for pun
-                # with dpg.tab(label="RSI Charts", tag=f"dpg_tab_{timestamp}") as dpg_tab:
-                #     try:
-                #         # Pass the tab itself as parent, not the tab bar
-                #         create_main_rsi_graph(dpg_tab, timestamp)
-                #     except Exception as e:
-                #         print(f"Error creating DPG charts tab: {e}")
-                #         dpg.add_text(f"Error loading DPG charts: {e}", color=[255, 0, 0])
-                
-                # # Tab 2: Advanced Pandas/Matplotlib charts
-                # with dpg.tab(label="Advanced Analysis", tag=f"advanced_tab_{timestamp}") as advanced_tab:
-                #     try:
-                #         create_advanced_analysis_tab(advanced_tab, timestamp)
-                #     except Exception as e:
-                #         print(f"Error creating advanced analysis tab: {e}")
-                #         dpg.add_text(f"Error loading advanced analysis: {e}", color=[255, 0, 0])
-                
-                # # Tab 3: Interactive Plotly charts
-                # with dpg.tab(label="Interactive Charts", tag=f"interactive_tab_{timestamp}") as interactive_tab:
-                #     try:
-                #         create_interactive_tab(interactive_tab, timestamp)
-                #     except Exception as e:
-                #         print(f"Error creating interactive charts tab: {e}")
-                #         dpg.add_text(f"Error loading interactive charts: {e}", color=[255, 0, 0])
-                
-                # # Tab 4: Sankey Analysis
-                # with dpg.tab(label="Flow Analysis", tag=f"sankey_tab_{timestamp}") as sankey_tab:
-                #     try:
-                #         create_sankey_tab(sankey_tab, timestamp)
-                #     except Exception as e:
-                #         print(f"Error creating sankey tab: {e}")
-                #         dpg.add_text(f"Error loading flow analysis: {e}", color=[255, 0, 0])
-   
+             
     except Exception as e:
         print(f"Error creating graph tabs container: {e}")
         # Fallback to simple content
@@ -218,7 +190,7 @@ def toggle_indicator_button(button_tag):
         dpg.configure_item("hint_2", show =True)
     else:
         dpg.configure_item("hint_2", show = False)
-        
+    populate_chart_tabs()
     print(f"📊 Active indicators: {[dpg.get_item_label(tag) for tag in active_indicator_buttons]}")
 
 def reset_all_indicator_buttons():
@@ -233,10 +205,95 @@ def reset_all_indicator_buttons():
                     dpg.bind_item_theme(child, "indicator_button_inactive_theme")
                     button_label = dpg.get_item_label(child)
                     print(f"🔘 Reset {button_label} to inactive")
-    
+
     active_indicator_buttons.clear()
+    populate_chart_tabs()
     print("🔄 All indicator buttons reset to inactive")
 
+def populate_chart_tabs():
+    """Populate chart tabs based on active indicator buttons and active stocks"""
+    global active_indicator_buttons
+    global chart_tabs_tag
+    
+    print(f"🔧 populate_chart_tabs called")
+    print(f"📊 Active indicators: {len(active_indicator_buttons)}")
+    
+    if not chart_tabs_tag or not dpg.does_item_exist(chart_tabs_tag):
+        print("❌ Could not find chart tabs container")
+        return
+    
+    # Clear existing tabs
+    children = dpg.get_item_children(chart_tabs_tag, 1)
+    if children:
+        print(f"🧹 Clearing {len(children)} existing tabs")
+        for child in children:
+            dpg.delete_item(child)
+    
+    # Get all active stocks
+    active_stocks = get_all_active_tags()
+    print(f"📊 Active stocks: {len(active_stocks)}")
+    
+    # Create tabs based on active indicators
+    for button_tag in active_indicator_buttons:
+        button_label = dpg.get_item_label(button_tag)
+        tab_tag = f"{button_label.lower()}_tab"
+        
+        with dpg.tab(label=f"{button_label} Analysis", tag=tab_tag, parent=chart_tabs_tag):            
+            # This should never run!
+            if len(active_stocks) == 0:
+                # No stocks selected
+                dpg.add_text("No stocks selected. Add stocks using the + button above.", 
+                           color=[255, 150, 100], indent=20)
+            else:
+                # Create charts for each active stock
+                dpg.add_spacer(height=10)
+                # Create a scrollable container for multiple charts
+                with dpg.child_window(width=-1, height=-1, border=False, 
+                                    tag=f"{button_label.lower()}_charts_container"):
+                    
+                    #dpg.add_text(f"Analyzing {len(active_stocks)} stock(s) with {button_label}",       color=[150, 255, 150], indent=10)
+                    
+                    for i, stock_tag in enumerate(active_stocks):
+                        symbol = stock_tag.symbol
+                        company_name = stock_tag.company_name
+                        
+                        # Create individual chart container for each stock
+                        chart_container_tag = f"{button_label.lower()}_{symbol}_chart"  # Remove timestamp
+                        
+                        # Stock header
+                        with dpg.group(horizontal=True):
+                            dpg.add_text(f"{i+1}.{symbol}", color=[255, 255, 255],indent=5)
+                            dpg.add_text(f"({company_name})", color=[150, 150, 150])
+                                                                                
+                        # Placeholder for actual chart components
+                        if button_label == "RSI":
+                            create_rsi_chart_for_stock(f"{button_label.lower()}_charts_container", symbol)
+                        elif button_label == "PRICE":
+                            dpg.add_text(f"Price analysis for {symbol}", 
+                                        color=[150, 255, 200])
+                        elif button_label == "LINEAR REGRESSION PRICE":
+                            dpg.add_text(f"Linear regression for {symbol}", 
+                                        color=[255, 200, 150])
+                        
+                        # Add spacing between charts
+                        if i < len(active_stocks) - 1:
+                            dpg.add_spacer(height=15)
+        
+        print(f"📊 Created tab for {button_label} with {len(active_stocks)} stock charts")
+    
+    if len(active_indicator_buttons) == 0:
+        # Show default message when no indicators are active
+        with dpg.tab(label="Select Indicators", tag="default_tab", parent=chart_tabs_tag):  # Remove timestamp
+            dpg.add_spacer(height=50)
+            dpg.add_text("💡 Select indicator buttons above to see analysis charts", 
+                       color=[150, 150, 150], indent=50)
+            dpg.add_spacer(height=20)
+            dpg.add_text("Available indicators: RSI, PRICE, LINEAR REGRESSION", 
+                       color=[100, 100, 100], indent=50)
+            dpg.add_spacer(height=10)
+            dpg.add_text(f"Active stocks: {len(get_all_active_tags())}", 
+                       color=[100, 100, 100], indent=50)
+                   
 def get_active_indicators():
     """Get list of currently active indicator button labels"""
     return [dpg.get_item_label(tag) for tag in active_indicator_buttons if dpg.does_item_exist(tag)]
@@ -300,43 +357,12 @@ def indicator_activation():
         # Reset buttons to inactive when no stocks
         if not has_stocks:
             reset_all_indicator_buttons()
+        else:
+            populate_chart_tabs()
         
         print(f"{'👁️' if has_stocks else '🙈'} Group indicators {'shown' if has_stocks else 'hidden'}")
     else:
         print("❌ group_indicators does not exist")
 
-def run_analysis_on_focused_stock(analysis_type):
-    """Run analysis on the currently focused stock"""
-    from components.stock.stock_data_manager import get_focused_tag
-    
-    focused_tag = get_focused_tag()
-    if focused_tag:
-        symbol = focused_tag.symbol
-        print(f"🔄 Running {analysis_type} analysis for {symbol}")
-        
-        if analysis_type == "rsi":
-            run_rsi_analysis(symbol)
-        elif analysis_type == "price":
-            run_price_analysis(symbol)
-        elif analysis_type == "linear":
-            run_linear_analysis(symbol)
-    else:
-        print("❌ No stock selected. Please click on a stock tag first.")
-
-def run_rsi_analysis(symbol):
-    toggle_indicator_button("rsi_button")
-    """Run RSI analysis on specified stock"""
-    print(f"📈 Running RSI analysis for {symbol}")
-    # Add your RSI analysis code here
-
-def run_price_analysis(symbol):
-    """Run price analysis on specified stock"""
-    print(f"💰 Running price analysis for {symbol}")
-    # Add your price analysis code here
-
-def run_linear_analysis(symbol):
-    """Run linear regression analysis on specified stock"""
-    print(f"📊 Running linear regression for {symbol}")
-    # Add your linear regression analysis code here
     
     
