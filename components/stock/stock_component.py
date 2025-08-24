@@ -413,6 +413,13 @@ class StockTag:
         except ImportError:
             pass
         
+        # Clean up MOM stuff
+        try:
+            from Indicator.Indicator_MOM import cleanup_mom_plot_tracking
+            cleanup_mom_plot_tracking(self.symbol)
+        except ImportError:
+            pass
+        
         # Remove from tracking
         if self in _active_tags:
             _active_tags.remove(self)

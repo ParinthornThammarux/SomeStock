@@ -5,6 +5,7 @@ import dearpygui.dearpygui as dpg
 import time
 
 from Indicator.Indicator_EMA import create_ema_chart_for_stock
+from Indicator.Indicator_MOM import create_mom_chart_for_stock
 from components.stock.stock_data_manager import create_stock_tag, get_all_active_tags, get_favorited_stocks, find_tag_by_symbol,restore_tags_to_container
 from components.stock_search import create_stock_search
 from utils import constants
@@ -120,24 +121,24 @@ def create_graph_indicators(parent_tag):
                 dpg.add_text("Step 1 : Choose active stocks", tag="hint_1")
                 dpg.add_text("Step 2 : Pick indicators", tag="hint_2")
                 
-            # Update the button creation section (around line 92)
             with dpg.group(tag="group_indicators",horizontal=True,indent=5):
                 dpg.add_button(tag="rsi_button",label="RSI",callback=lambda: toggle_indicator_button("rsi_button"))
                 dpg.add_button(tag="price_button",label="PRICE",callback=lambda: toggle_indicator_button("price_button"))
                 dpg.add_button(tag="linear_price_button",label="LINEAR REGRESSION PRICE",callback=lambda: toggle_indicator_button("linear_price_button"))
                 dpg.add_button(tag="ema_button",label="EMA",callback=lambda: toggle_indicator_button("ema_button"))
+                dpg.add_button(tag="mom_button",label="MOM",callback=lambda: toggle_indicator_button("mom_button"))
 
             dpg.bind_item_theme("rsi_button", "indicator_button_inactive_theme")
             dpg.bind_item_theme("price_button", "indicator_button_inactive_theme")
             dpg.bind_item_theme("linear_price_button", "indicator_button_inactive_theme")
             dpg.bind_item_theme("ema_button", "indicator_button_inactive_theme")
+            dpg.bind_item_theme("mom_button", "indicator_button_inactive_theme")
             
-            #Set initial state
             indicator_activation()
 
             # Create tab bar for different chart types
             dpg.add_spacer(height=10)
-            with dpg.tab_bar(tag=chart_tabs_tag,indent=50):
+            with dpg.tab_bar(tag=chart_tabs_tag,indent=50,reorderable=True):
                 print("📈 created empty tab bar")
              
     except Exception as e:
@@ -273,6 +274,8 @@ def populate_chart_tabs():
                                         color=[255, 200, 150])
                         elif button_label == "EMA":
                             create_ema_chart_for_stock(f"{button_label.lower()}_charts_container", symbol)
+                        elif button_label == "MOM":
+                            create_mom_chart_for_stock(f"{button_label.lower()}_charts_container", symbol)
                         
                         # Add spacing between charts
                         if i < len(active_stocks) - 1:

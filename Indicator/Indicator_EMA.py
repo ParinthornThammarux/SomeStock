@@ -1,4 +1,4 @@
-# components/graph/graph_ema.py
+# components/indicator/Indicator_EMA.py
 
 import dearpygui.dearpygui as dpg
 import numpy as np
