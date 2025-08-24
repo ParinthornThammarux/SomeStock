@@ -92,16 +92,29 @@ def check_hover():
     """
     This function checks hover state for ALL existing RSI plots.
     """
-    for plot_tag, text_tag in plot_tag_to_text_tag.items():
-        if dpg.is_item_hovered(plot_tag):
-            # If a plot is hovered, `update_mouse_pos_text` will be called
-            # by its specific mouse move handler, so we don't need to do it here.
-            # You can add other logic here if needed, but the core mouse update is
-            # now handled by the per-plot mouse move handler.
-            pass
-        else:
-            # When the mouse moves away, update the text to indicate "not hovering"
-            dpg.set_value(text_tag, "Mouse RSI:")
+    global plot_tag_to_text_tag
+    
+    plot_tags_copy = list(plot_tag_to_text_tag.keys())
+    
+    for plot_tag in plot_tags_copy:
+        text_tag = plot_tag_to_text_tag[plot_tag]
+        
+        try:
+            # Check if both items still exist
+            if not dpg.does_item_exist(plot_tag) or not dpg.does_item_exist(text_tag):
+                # Clean up dead references
+                del plot_tag_to_text_tag[plot_tag]
+                continue
+                
+            if not dpg.is_item_hovered(plot_tag):
+                dpg.set_value(text_tag, "Mouse RSI:")
+                
+        except Exception as e:
+            # Clean up problematic entries
+            if plot_tag in plot_tag_to_text_tag:
+                del plot_tag_to_text_tag[plot_tag]
+            if constants.DEBUG:
+                print(f"⚠️ Cleaned up dead plot reference: {plot_tag}")
 
 def update_mouse_pos_text(sender, app_data, user_data):
     """
@@ -111,30 +124,40 @@ def update_mouse_pos_text(sender, app_data, user_data):
     plot_tag = user_data["plot_tag"]
     text_tag = user_data["text_tag"]
     
-    # Check if the mouse is actually hovering over the plot
-    if dpg.is_item_hovered(plot_tag):
-        mouse_pos = dpg.get_plot_mouse_pos()
-        if mouse_pos and len(mouse_pos) >= 2:
-            mouse_x, mouse_y = mouse_pos[0], mouse_pos[1]
+    try:
+        # Check if items still exist before using them
+        if not dpg.does_item_exist(plot_tag) or not dpg.does_item_exist(text_tag):
+            return
             
-            # Convert timestamp to readable date
-            try:
-                if mouse_x > 1000000000:
-                    import datetime
-                    date_obj = datetime.datetime.fromtimestamp(mouse_x)
-                    date_str = date_obj.strftime("%Y-%m-%d")
-                    dpg.set_value(text_tag, f"Mouse RSI: ({date_str}, {mouse_y:.2f})")
-                else:
-                    # Sequential numbers - show as day number
-                    dpg.set_value(text_tag, f"Mouse RSI: (Day {int(mouse_x)}, {mouse_y:.2f})")
-            except (ValueError, OSError, OverflowError):
-                # If timestamp conversion fails, show as number
-                dpg.set_value(text_tag, f"Mouse RSI: ({mouse_x:.0f}, {mouse_y:.2f})")
+        # Check if the mouse is actually hovering over the plot
+        if dpg.is_item_hovered(plot_tag):
+            mouse_pos = dpg.get_plot_mouse_pos()
+            if mouse_pos and len(mouse_pos) >= 2:
+                mouse_x, mouse_y = mouse_pos[0], mouse_pos[1]
+                
+                # Convert timestamp to readable date
+                try:
+                    if mouse_x > 1000000000:
+                        import datetime
+                        date_obj = datetime.datetime.fromtimestamp(mouse_x)
+                        date_str = date_obj.strftime("%Y-%m-%d")
+                        dpg.set_value(text_tag, f"Mouse RSI: ({date_str}, {mouse_y:.2f})")
+                    else:
+                        # Sequential numbers - show as day number
+                        dpg.set_value(text_tag, f"Mouse RSI: (Day {int(mouse_x)}, {mouse_y:.2f})")
+                except (ValueError, OSError, OverflowError):
+                    # If timestamp conversion fails, show as number
+                    dpg.set_value(text_tag, f"Mouse RSI: ({mouse_x:.0f}, {mouse_y:.2f})")
+            else:
+                dpg.set_value(text_tag, "Mouse RSI: No position")
         else:
-            dpg.set_value(text_tag, "Mouse RSI: No position")
-    else:
-        dpg.set_value(text_tag, "Mouse RSI:")
-             
+            dpg.set_value(text_tag, "Mouse RSI:")
+            
+    except Exception as e:
+        # Silently handle errors when items are deleted
+        if constants.DEBUG:
+            print(f"⚠️ Mouse handler error (item likely deleted): {e}")
+              
 def _fetch_and_plot_rsi_async(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag, status_tag):
     """Use the stock fetch layer to get stock data and calculate RSI"""
     try:
@@ -495,3 +518,21 @@ def get_rsi_for_symbol(symbol, period=14):
     except Exception as e:
         print(f"❌ Error getting RSI for {symbol}: {e}")
         return None, "Error", [255, 100, 100]
+    
+def cleanup_rsi_plot_tracking(symbol):
+    """Clean up RSI plot tracking when a stock is removed"""
+    global plot_tag_to_text_tag
+    
+    try:
+        # Find and remove plot tags for this symbol
+        keys_to_remove = []
+        for plot_tag in plot_tag_to_text_tag.keys():
+            if symbol in plot_tag:  # Plot tags contain the symbol
+                keys_to_remove.append(plot_tag)
+        
+        for key in keys_to_remove:
+            del plot_tag_to_text_tag[key]
+            print(f"🧹 Cleaned up RSI plot tracking for {symbol}")
+            
+    except Exception as e:
+        print(f"⚠️ Error cleaning up RSI tracking: {e}")

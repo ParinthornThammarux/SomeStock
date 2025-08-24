@@ -399,6 +399,13 @@ class StockTag:
         if _focused_tag == self:
             _focused_tag = None
         
+        # Clean up RSI stuff
+        try:
+            from Indicator.Indicator_RSI import cleanup_rsi_plot_tracking
+            cleanup_rsi_plot_tracking(self.symbol)
+        except ImportError:
+            pass
+        
         # Remove from tracking
         if self in _active_tags:
             _active_tags.remove(self)
