@@ -4,7 +4,7 @@ import dearpygui.dearpygui as dpg
 import os
 from pathlib import Path
 
-VERSION = "v1.5.0 RSI EMA MOM finish? and Price WIP"
+VERSION = "v1.8.0 RSI EMA MOM Hammer Doji finish? and Price WIP"
 DEBUG = True
 # --- Font Awesome Icon Setup ---
 # IMPORTANT: You need the Font Awesome Free font file 'fa-solid-900.ttf'.
