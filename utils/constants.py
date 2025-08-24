@@ -4,7 +4,7 @@ import dearpygui.dearpygui as dpg
 import os
 from pathlib import Path
 
-VERSION = "v1.1.0 Table loaded and Indicator imported"
+VERSION = "v1.2.0 RSI and Price WIP"
 DEBUG = True
 # --- Font Awesome Icon Setup ---
 # IMPORTANT: You need the Font Awesome Free font file 'fa-solid-900.ttf'.
@@ -177,7 +177,7 @@ small_font_awesome_icon_font_id = None
 
 # --- SET screen size
 WinW = 1400
-WinH = 800
+WinH = 900
 
 # --- Helper to load fonts ---
 def load_fonts():
