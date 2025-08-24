@@ -11,10 +11,14 @@ from utils import constants
 from utils.stock_fetch_layer import fetch_stock_data
 from components.stock.stock_data_manager import get_cached_stock_data, find_tag_by_symbol
 
+
+plot_tag_to_text_tag = {}
+
 def create_rsi_chart_for_stock(parent_tag, symbol, container_height=540):
     """
     Create a RSI chart for a specific stock within a container
     """
+    
     try:
         print(f"📊 Creating RSI chart for {symbol}")
         
@@ -25,6 +29,7 @@ def create_rsi_chart_for_stock(parent_tag, symbol, container_height=540):
         x_axis_tag = f"rsi_x_axis_{symbol}_{timestamp}"
         y_axis_tag = f"rsi_y_axis_{symbol}_{timestamp}"
         line_tag = f"rsi_line_{symbol}_{timestamp}"
+        mouse_text_tag = f"{symbol}_mouse_rsi_{timestamp}"
         
         with dpg.child_window(
             width=-1, 
@@ -40,7 +45,10 @@ def create_rsi_chart_for_stock(parent_tag, symbol, container_height=540):
             
             dpg.add_separator()
             dpg.add_spacer(height=5)
+            dpg.add_text("Mouse RSI:", tag=mouse_text_tag)
             
+            dpg.set_frame_callback(0, callback=check_hover) # '0' means run every frame
+
             # Create the RSI plot (separate from price plot)
             with dpg.plot(
                 label="", 
@@ -53,11 +61,18 @@ def create_rsi_chart_for_stock(parent_tag, symbol, container_height=540):
             ):
                 dpg.add_plot_legend()
                 dpg.add_plot_axis(dpg.mvXAxis, label="Time Period", tag=x_axis_tag)
-                dpg.add_plot_axis(dpg.mvYAxis, label="RSI Value", tag=y_axis_tag, tick_format="%.2f")
+                dpg.add_plot_axis(dpg.mvYAxis, label="RSI Value", tag=y_axis_tag)
 
                 dpg.add_line_series([], [], parent=y_axis_tag, tag=line_tag, label=f"RSI {symbol}")
                 dpg.set_axis_limits(x_axis_tag, 0, 100)
                 dpg.set_axis_limits(y_axis_tag, 0, 100)
+        with dpg.handler_registry():
+                dpg.add_mouse_move_handler(
+                    callback=update_mouse_pos_text, 
+                    user_data={"plot_tag": plot_tag, "text_tag": mouse_text_tag}
+                    )
+        plot_tag_to_text_tag[plot_tag] = mouse_text_tag
+
         
         # Start RSI calculation using global fetch system
         thread = threading.Thread(
@@ -72,7 +87,54 @@ def create_rsi_chart_for_stock(parent_tag, symbol, container_height=540):
     except Exception as e:
         print(f"❌ Error creating RSI chart for {symbol}: {e}")
         return None
+
+def check_hover():
+    """
+    This function checks hover state for ALL existing RSI plots.
+    """
+    for plot_tag, text_tag in plot_tag_to_text_tag.items():
+        if dpg.is_item_hovered(plot_tag):
+            # If a plot is hovered, `update_mouse_pos_text` will be called
+            # by its specific mouse move handler, so we don't need to do it here.
+            # You can add other logic here if needed, but the core mouse update is
+            # now handled by the per-plot mouse move handler.
+            pass
+        else:
+            # When the mouse moves away, update the text to indicate "not hovering"
+            dpg.set_value(text_tag, "Mouse RSI:")
+
+def update_mouse_pos_text(sender, app_data, user_data):
+    """
+    Updates the mouse position text for the specific plot it's hovering over.
+    Shows actual dates instead of timestamps.
+    """
+    plot_tag = user_data["plot_tag"]
+    text_tag = user_data["text_tag"]
     
+    # Check if the mouse is actually hovering over the plot
+    if dpg.is_item_hovered(plot_tag):
+        mouse_pos = dpg.get_plot_mouse_pos()
+        if mouse_pos and len(mouse_pos) >= 2:
+            mouse_x, mouse_y = mouse_pos[0], mouse_pos[1]
+            
+            # Convert timestamp to readable date
+            try:
+                if mouse_x > 1000000000:
+                    import datetime
+                    date_obj = datetime.datetime.fromtimestamp(mouse_x)
+                    date_str = date_obj.strftime("%Y-%m-%d")
+                    dpg.set_value(text_tag, f"Mouse RSI: ({date_str}, {mouse_y:.2f})")
+                else:
+                    # Sequential numbers - show as day number
+                    dpg.set_value(text_tag, f"Mouse RSI: (Day {int(mouse_x)}, {mouse_y:.2f})")
+            except (ValueError, OSError, OverflowError):
+                # If timestamp conversion fails, show as number
+                dpg.set_value(text_tag, f"Mouse RSI: ({mouse_x:.0f}, {mouse_y:.2f})")
+        else:
+            dpg.set_value(text_tag, "Mouse RSI: No position")
+    else:
+        dpg.set_value(text_tag, "Mouse RSI:")
+             
 def _fetch_and_plot_rsi_async(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag, status_tag):
     """Use the stock fetch layer to get stock data and calculate RSI"""
     try:
@@ -228,7 +290,8 @@ def _process_rsi_data(price_df, symbol, line_tag, x_axis_tag, y_axis_tag, plot_t
             x_data = list(range(len(rsi_data)))
        
         y_data = rsi_data.tolist()
-        print(f"🔍 RSI data types - numpy: {type(rsi_data[0])}, list: {type(y_data[0])}, values: {y_data[-5:]}")
+        if constants.DEBUG:
+            print(f"🔍 RSI data types - numpy: {type(rsi_data[0])}, list: {type(y_data[0])}, values: {y_data[-5:]}")
 
         latest_rsi = rsi_data[-1] if len(rsi_data) > 0 else 0
 
