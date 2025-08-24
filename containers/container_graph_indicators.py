@@ -8,6 +8,7 @@ from Indicator.Indicator_Doji import create_doji_chart_for_stock
 from Indicator.Indicator_EMA import create_ema_chart_for_stock
 from Indicator.Indicator_Hammer import create_hammer_chart_for_stock
 from Indicator.Indicator_MOM import create_mom_chart_for_stock
+from Indicator.Indicator_Peg import create_peg_table_for_stock
 from components.stock.stock_data_manager import create_stock_tag, get_all_active_tags, get_favorited_stocks, find_tag_by_symbol,restore_tags_to_container
 from components.stock_search import create_stock_search
 from utils import constants
@@ -123,14 +124,16 @@ def create_graph_indicators(parent_tag):
                 dpg.add_text("Step 1 : Choose active stocks", tag="hint_1")
                 dpg.add_text("Step 2 : Pick indicators", tag="hint_2")
                 
-            with dpg.group(tag="group_indicators",horizontal=True,indent=5):
-                dpg.add_button(tag="rsi_button",label="RSI",callback=lambda: toggle_indicator_button("rsi_button"))
-                dpg.add_button(tag="price_button",label="PRICE",callback=lambda: toggle_indicator_button("price_button"))
-                dpg.add_button(tag="linear_price_button",label="LINEAR REGRESSION PRICE",callback=lambda: toggle_indicator_button("linear_price_button"))
-                dpg.add_button(tag="ema_button",label="EMA",callback=lambda: toggle_indicator_button("ema_button"))
-                dpg.add_button(tag="mom_button",label="MOM",callback=lambda: toggle_indicator_button("mom_button"))
-                dpg.add_button(tag="hammer_button",label="HAMMER",callback=lambda: toggle_indicator_button("hammer_button"))
-                dpg.add_button(tag="doji_button",label="DOJI",callback=lambda: toggle_indicator_button("doji_button"))
+            with dpg.group(tag="group_indicators", horizontal=True, indent=5):
+                dpg.add_button(tag="doji_button", label="DOJI", callback=lambda: toggle_indicator_button("doji_button"))
+                dpg.add_button(tag="ema_button", label="EMA", callback=lambda: toggle_indicator_button("ema_button"))
+                dpg.add_button(tag="hammer_button", label="HAMMER", callback=lambda: toggle_indicator_button("hammer_button"))
+                dpg.add_button(tag="linear_price_button", label="LINEAR REGRESSION PRICE", callback=lambda: toggle_indicator_button("linear_price_button"))
+                dpg.add_button(tag="mom_button", label="MOM", callback=lambda: toggle_indicator_button("mom_button"))
+                dpg.add_button(tag="peg_button", label="PEG", callback=lambda: toggle_indicator_button("peg_button"))
+                dpg.add_button(tag="price_button", label="PRICE", callback=lambda: toggle_indicator_button("price_button"))
+                dpg.add_button(tag="rsi_button", label="RSI", callback=lambda: toggle_indicator_button("rsi_button"))
+
             dpg.bind_item_theme("rsi_button", "indicator_button_inactive_theme")
             dpg.bind_item_theme("price_button", "indicator_button_inactive_theme")
             dpg.bind_item_theme("linear_price_button", "indicator_button_inactive_theme")
@@ -138,6 +141,7 @@ def create_graph_indicators(parent_tag):
             dpg.bind_item_theme("mom_button", "indicator_button_inactive_theme")
             dpg.bind_item_theme("hammer_button", "indicator_button_inactive_theme")
             dpg.bind_item_theme("doji_button", "indicator_button_inactive_theme")
+            dpg.bind_item_theme("peg_button", "indicator_button_inactive_theme")
 
             indicator_activation()
 
@@ -285,6 +289,8 @@ def populate_chart_tabs():
                             create_hammer_chart_for_stock(f"{button_label.lower()}_charts_container", symbol)
                         elif button_label == "DOJI":
                             create_doji_chart_for_stock(f"{button_label.lower()}_charts_container", symbol)
+                        elif button_label == "PEG":
+                            create_peg_table_for_stock(f"{button_label.lower()}_charts_container", symbol)
                         # Add spacing between charts
                         if i < len(active_stocks) - 1:
                             dpg.add_spacer(height=15)
