@@ -2,9 +2,9 @@
 
 # This acts as a container for all the graph types tabs 
 import dearpygui.dearpygui as dpg
-import random
 import time
 
+from Indicator.Indicator_EMA import create_ema_chart_for_stock
 from components.stock.stock_data_manager import create_stock_tag, get_all_active_tags, get_favorited_stocks, find_tag_by_symbol,restore_tags_to_container
 from components.stock_search import create_stock_search
 from utils import constants
@@ -125,10 +125,12 @@ def create_graph_indicators(parent_tag):
                 dpg.add_button(tag="rsi_button",label="RSI",callback=lambda: toggle_indicator_button("rsi_button"))
                 dpg.add_button(tag="price_button",label="PRICE",callback=lambda: toggle_indicator_button("price_button"))
                 dpg.add_button(tag="linear_price_button",label="LINEAR REGRESSION PRICE",callback=lambda: toggle_indicator_button("linear_price_button"))
-                
+                dpg.add_button(tag="ema_button",label="EMA",callback=lambda: toggle_indicator_button("ema_button"))
+
             dpg.bind_item_theme("rsi_button", "indicator_button_inactive_theme")
             dpg.bind_item_theme("price_button", "indicator_button_inactive_theme")
             dpg.bind_item_theme("linear_price_button", "indicator_button_inactive_theme")
+            dpg.bind_item_theme("ema_button", "indicator_button_inactive_theme")
             
             #Set initial state
             indicator_activation()
@@ -269,6 +271,8 @@ def populate_chart_tabs():
                         elif button_label == "LINEAR REGRESSION PRICE":
                             dpg.add_text(f"Linear regression for {symbol}", 
                                         color=[255, 200, 150])
+                        elif button_label == "EMA":
+                            create_ema_chart_for_stock(f"{button_label.lower()}_charts_container", symbol)
                         
                         # Add spacing between charts
                         if i < len(active_stocks) - 1:

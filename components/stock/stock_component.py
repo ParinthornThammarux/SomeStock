@@ -406,6 +406,13 @@ class StockTag:
         except ImportError:
             pass
         
+        # Clean up EMA stuff
+        try:
+            from Indicator.Indicator_EMA import cleanup_ema_plot_tracking
+            cleanup_ema_plot_tracking(self.symbol)
+        except ImportError:
+            pass
+        
         # Remove from tracking
         if self in _active_tags:
             _active_tags.remove(self)
