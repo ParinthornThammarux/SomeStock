@@ -42,6 +42,12 @@ def create_stock_search(mode="callback", callback=None, line_tag=None, x_axis_ta
     search_mode = mode
     search_callback_func = callback
     
+    #Cleanup was missing 
+    if dpg.does_item_exist("stock_search_popup"):
+        dpg.delete_item("stock_search_popup")
+    if dpg.does_item_exist("table_button_theme"):
+        dpg.delete_item("table_button_theme")
+        
     if line_tag and x_axis_tag and y_axis_tag and plot_tag:
         chart_tags = {
             'line_tag': line_tag,

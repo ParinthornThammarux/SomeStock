@@ -32,6 +32,7 @@ def create_ema_chart_for_stock(parent_tag, symbol, container_height=540):
         ema26_line_tag = f"ema26_line_{symbol}_{timestamp}"
         mouse_text_tag = f"{symbol}_mouse_ema_{timestamp}"
         
+        
         with dpg.child_window(
             width=-1, 
             height=container_height, 
@@ -68,7 +69,32 @@ def create_ema_chart_for_stock(parent_tag, symbol, container_height=540):
                 dpg.add_line_series([], [], parent=y_axis_tag, tag=price_line_tag, label=f"Price {symbol}")
                 dpg.add_line_series([], [], parent=y_axis_tag, tag=ema12_line_tag, label="EMA 12")
                 dpg.add_line_series([], [], parent=y_axis_tag, tag=ema26_line_tag, label="EMA 26")
+               
+                # Create color themes for line series
+                price_theme_tag = f"price_theme_{timestamp}"
+                ema12_theme_tag = f"ema12_theme_{timestamp}"
+                ema26_theme_tag = f"ema26_theme_{timestamp}"
 
+                # Blue theme for price line
+                with dpg.theme(tag=price_theme_tag):
+                    with dpg.theme_component(dpg.mvLineSeries):
+                        dpg.add_theme_color(dpg.mvPlotCol_Line, (0, 100, 255, 255), category=dpg.mvThemeCat_Plots)  # Blue
+
+                # Orange theme for EMA12 line  
+                with dpg.theme(tag=ema12_theme_tag):
+                    with dpg.theme_component(dpg.mvLineSeries):
+                        dpg.add_theme_color(dpg.mvPlotCol_Line, (255, 165, 0, 255), category=dpg.mvThemeCat_Plots)  # Orange
+
+                # Green theme for EMA26 line
+                with dpg.theme(tag=ema26_theme_tag):
+                    with dpg.theme_component(dpg.mvLineSeries):
+                        dpg.add_theme_color(dpg.mvPlotCol_Line, (0, 200, 0, 255), category=dpg.mvThemeCat_Plots)  # Green
+
+                # Bind themes to line series
+                dpg.bind_item_theme(price_line_tag, price_theme_tag)
+                dpg.bind_item_theme(ema12_line_tag, ema12_theme_tag)
+                dpg.bind_item_theme(ema26_line_tag, ema26_theme_tag)
+                
                 dpg.set_axis_limits(x_axis_tag, 0, 100)
                 dpg.set_axis_limits(y_axis_tag, 0, 200)
                 
