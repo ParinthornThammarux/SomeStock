@@ -5,6 +5,7 @@ import os
 stock_data = None
 chart_tags = {}
 
+from utils import constants
 from utils.stock_fetch_layer import fetch_stock_data
 from components.stock.stock_data_manager import add_stock_tag
 
@@ -65,7 +66,8 @@ def create_stock_search(mode="callback", callback=None, line_tag=None, x_axis_ta
         tag="stock_search_popup",
         width=550,
         height=600,
-        pos=[mouse_pos[0] + 10, mouse_pos[1] + 10],
+        #pos=[mouse_pos[0] + 10, mouse_pos[1] + 10],
+        pos=[constants.WinW/2 - (550/2),constants.WinH/2 - (660/2)],
         no_resize=True,
         no_collapse=True,
         modal=True,
