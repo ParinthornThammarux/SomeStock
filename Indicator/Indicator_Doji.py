@@ -1,7 +1,9 @@
 # components/indicator/indicator_Doji.py
 
+import datetime
 import dearpygui.dearpygui as dpg
 import numpy as np
+import pandas as pd 
 import time
 import threading
 
@@ -36,10 +38,11 @@ def create_doji_chart_for_stock(parent_tag, symbol, container_height=540):
             dpg.add_spacer(height=5)
 
             # candlestick plot
-            with dpg.plot(label="Doji Candles", height=-1, width=-1, tag=plot_tag, crosshairs=True):
+            with dpg.plot(label="Doji Candles", height=-1, width=-1, tag=plot_tag, crosshairs=True,equal_aspects=False):
                 dpg.add_plot_legend()
                 dpg.add_plot_axis(dpg.mvXAxis, label="Date", tag=x_axis_tag, time=True)
                 dpg.add_plot_axis(dpg.mvYAxis, label="Price", tag=y_axis_tag)
+                
 
     
                 # candlestick series placeholder
@@ -157,10 +160,16 @@ def _process_doji_data(price_df, symbol, candle_tag, marker_tag, x_axis_tag, y_a
             y_max = max(df["high"].max(), max(dy) if dy else df["high"].max())
             y_range = y_max - y_min
             dpg.set_axis_limits(y_axis_tag, y_min - y_range*0.05, y_max + y_range*0.05)
-            
+        if dpg.does_item_exist(status_tag):
+            formatted_dates = [d.strftime('%Y-%m-%d') for d in doji_dates]
+            for d in dx:
+                if isinstance(d, (pd.Timestamp, datetime.datetime)):
+                    formatted_dates.append(d.strftime('%Y-%m-%d'))
+                else:  # assume timestamp in seconds
+                    formatted_dates.append(datetime.datetime.fromtimestamp(d).strftime('%Y-%m-%d'))
         # Status
         if dpg.does_item_exist(status_tag):
-            dpg.set_value(status_tag, f"Detected {len(dx)} Doji candles on dates: {[d.strftime('%Y-%m-%d') for d in doji_dates]}")
+            dpg.set_value(status_tag, f"Detected {len(dx)} Doji candles on dates: {formatted_dates}")
             dpg.configure_item(status_tag, color=[0, 255, 255] if len(dx) > 0 else [255, 255, 255])
     except Exception as e:
         print(f"❌ Error Doji detection for {symbol}: {e}")

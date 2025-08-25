@@ -6,7 +6,7 @@ import time
 
 from utils import constants
 
-# ==================== PEG Ratio Scraper (Improved) ====================
+# ==================== PEG Ratio Scraper ====================
 def fetch_peg_ratio(symbol):
     """
     Fetches the PEG Ratio (5yr expected) for a given stock symbol from Yahoo Finance.
