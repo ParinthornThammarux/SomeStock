@@ -8,8 +8,10 @@ chart_tags = {}
 from utils.stock_fetch_layer import fetch_stock_data
 from components.stock.stock_data_manager import add_stock_tag
 
-search_mode = "callback" 
+search_mode = "callback"
 search_callback_func = None
+search_period = "1y"
+search_interval = "1d"
 
 def load_stock_data():
     """Load stock data from JSON file on startup"""
@@ -28,19 +30,23 @@ def load_stock_data():
         print(f"Error loading stock data: {e}")
         stock_data = None
 
-def create_stock_search(mode="callback", callback=None, line_tag=None, x_axis_tag=None, y_axis_tag=None, plot_tag=None):
+def create_stock_search(mode="callback", callback=None, line_tag=None, x_axis_tag=None, y_axis_tag=None, plot_tag=None, period="1y", interval="1d"):
     """
     Create stock search popup
-    
+
     Args:
         mode: "callback" or "chart" (programmer specifies)
         callback: Function to call with selected symbol (callback mode)
         line_tag, x_axis_tag, y_axis_tag, plot_tag: Chart tags (chart mode)
+        period: Time period for data fetch (e.g., "1y", "6mo")
+        interval: Data interval (e.g., "1d", "1h")
     """
-    global search_mode, search_callback_func, chart_tags
-    
+    global search_mode, search_callback_func, chart_tags, search_period, search_interval
+
     search_mode = mode
     search_callback_func = callback
+    search_period = period
+    search_interval = interval
     
     if line_tag and x_axis_tag and y_axis_tag and plot_tag:
         chart_tags = {
@@ -82,11 +88,11 @@ def create_stock_search(mode="callback", callback=None, line_tag=None, x_axis_ta
             dpg.add_table_column(label="Market Cap", width_fixed=False, init_width_or_weight=100)
 
 def search_callback():
-    global search_mode, search_callback_func
-    
+    global search_mode, search_callback_func, search_period, search_interval
+
     symbol = dpg.get_value('stock_name').strip().upper()
-    print(f"Search for: {symbol} (mode: {search_mode})")
-    
+    print(f"Search for: {symbol} (mode: {search_mode}, period: {search_period}, interval: {search_interval})")
+
     if symbol:
         if search_mode == "callback" and search_callback_func:
             search_callback_func(symbol)
@@ -212,31 +218,43 @@ def row_clicked(stock_data):
 
 def row_clicked_chart_mode(stock_data):
     """Chart mode functionality - works with or without chart tags"""
+    global search_period, search_interval
+
     symbol = stock_data['symbol']
     company_name = stock_data['company_name']
-    
+
     try:
         from components.stock.stock_data_manager import add_stock_tag
-        
+
         # Create stock tag (will be created in the default container)
         tag = add_stock_tag(symbol, company_name)
-        
+
         if tag:
             # Only try to update chart if chart tags are available
             if 'chart_tags' in globals() and chart_tags and all(chart_tags.values()):
                 if not tag.stock_data.is_cache_valid():
+                    print(f"📊 Fetching {symbol} with period: {search_period}, interval: {search_interval}")
                     fetch_stock_data(
                         symbol,
                         chart_tags['line_tag'],
                         chart_tags['x_axis_tag'],
                         chart_tags['y_axis_tag'],
-                        chart_tags['plot_tag']
+                        chart_tags['plot_tag'],
+                        period=search_period,
+                        interval=search_interval
                     )
                 else:
                     tag.load_chart_from_cache()
             else:
-                print(f"📋 Created stock tag for {symbol} (no chart update)")
-        
+                # No chart tags but still fetch data with period/interval
+                print(f"📊 Fetching {symbol} data with period: {search_period}, interval: {search_interval}")
+                fetch_stock_data(
+                    symbol, None, None, None, None,
+                    period=search_period,
+                    interval=search_interval
+                )
+                print(f"📋 Created stock tag for {symbol}")
+
     except Exception as e:
         print(f"❌ Error adding stock: {e}")
         

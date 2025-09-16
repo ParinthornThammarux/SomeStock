@@ -20,6 +20,8 @@ current_x_axis_tag = None
 current_y_axis_tag = None
 current_plot_tag = None
 current_table_tag = None
+current_period_combo_tag = None
+current_interval_combo_tag = None
 
 # Thread lock for table operations
 table_lock = threading.Lock()
@@ -75,8 +77,52 @@ def create_main_graph(parent_tag, timestamp=None):
                     dpg.set_axis_limits(x_axis_tag, 0, 50)
                     dpg.set_axis_limits(y_axis_tag, 80, 120)
     
-        # Small buttons below the graph - this holds the stock tags
+        # Controls section with dropdowns
         dpg.add_spacer(height=5)
+
+        # Period and Interval selectors
+        with dpg.group(horizontal=True):
+            dpg.add_text("Period:", color=[200, 200, 200])
+            dpg.add_spacer(width=5)
+
+            period_combo_tag = f"period_combo_{timestamp}"
+            dpg.add_combo(
+                ["1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"],
+                default_value="1y",
+                width=80,
+                tag=period_combo_tag,
+                callback=on_period_interval_change
+            )
+
+            dpg.add_spacer(width=20)
+            dpg.add_text("Interval:", color=[200, 200, 200])
+            dpg.add_spacer(width=5)
+
+            interval_combo_tag = f"interval_combo_{timestamp}"
+            dpg.add_combo(
+                ["1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h", "1d", "5d", "1wk", "1mo", "3mo"],
+                default_value="1d",
+                width=80,
+                tag=interval_combo_tag,
+                callback=on_period_interval_change
+            )
+
+            # Store combo tags globally for access
+            global current_period_combo_tag, current_interval_combo_tag
+            current_period_combo_tag = period_combo_tag
+            current_interval_combo_tag = interval_combo_tag
+
+            dpg.add_spacer(width=20)
+            dpg.add_button(
+                label="Apply",
+                callback=apply_period_interval_changes,
+                width=60,
+                height=25
+            )
+
+        dpg.add_spacer(height=8)
+
+        # Small buttons below the graph - this holds the stock tags
         with dpg.group(horizontal=True):
             with dpg.group(horizontal=True, tag='tags_container'):
                 dpg.add_spacer(width=-1)
@@ -166,16 +212,113 @@ def create_main_graph(parent_tag, timestamp=None):
             dpg.add_spacer(width=10)
             dpg.add_button(label="Back to Welcome", callback=go_to_welcome, width=150)
 
+    # Auto-repopulate table on page load
+    _auto_repopulate_table_on_load()
+
+def _auto_repopulate_table_on_load():
+    """Auto-repopulate the stock table on page load using cached data or refetch if expired"""
+    try:
+        print("🔄 Auto-repopulating stock table on page load...")
+
+        from components.stock.stock_data_manager import get_all_stock_tags, get_cached_stock_data
+
+        # Get all existing stock tags from cache
+        stock_tags = get_all_stock_tags()
+
+        if not stock_tags:
+            print("📋 No cached stocks found, table will remain empty")
+            return
+
+        repopulated_count = 0
+        expired_count = 0
+
+        # Process each cached stock
+        for stock_tag in stock_tags:
+            try:
+                symbol = stock_tag.symbol
+                print(f"📦 Processing cached stock: {symbol}")
+
+                # Check if cache is valid for this stock
+                cached_data = get_cached_stock_data(symbol, f"{symbol} Corp.", "1y", "1d")
+
+                if cached_data and cached_data.is_cache_valid():
+                    # Cache is valid, add directly to table
+                    print(f"✅ Using valid cache for {symbol}")
+                    add_stock_to_portfolio_table(symbol)
+                    repopulated_count += 1
+                else:
+                    # Cache is expired, trigger refresh in background
+                    print(f"🔄 Cache expired for {symbol}, triggering refresh...")
+                    expired_count += 1
+
+                    # Start background thread to refetch data
+                    def refresh_expired_stock(sym):
+                        try:
+                            from utils.stock_fetch_layer import fetch_stock_data
+                            fetch_stock_data(sym, None, None, None, None, period="1y", interval="1d")
+
+                            # Add to table after refresh (with small delay to ensure data is cached)
+                            import time
+                            time.sleep(2)
+                            add_stock_to_portfolio_table(sym)
+                            print(f"✅ Refreshed and added {sym} to table")
+                        except Exception as e:
+                            print(f"❌ Error refreshing expired stock {sym}: {e}")
+
+                    import threading
+                    refresh_thread = threading.Thread(target=refresh_expired_stock, args=(symbol,))
+                    refresh_thread.daemon = True
+                    refresh_thread.start()
+
+            except Exception as e:
+                print(f"❌ Error processing stock {stock_tag.symbol}: {e}")
+                continue
+
+        if repopulated_count > 0:
+            print(f"✅ Auto-repopulated table with {repopulated_count} stocks from cache")
+        if expired_count > 0:
+            print(f"🔄 Refreshing {expired_count} expired stocks in background")
+
+        if repopulated_count == 0 and expired_count == 0:
+            print("📋 No valid cached stocks found for repopulation")
+
+    except Exception as e:
+        print(f"❌ Error in auto-repopulation: {e}")
+        import traceback
+        traceback.print_exc()
+
 def plus_button_callback():
-    """Open stock search dialog"""
+    """Open stock search dialog with current period/interval settings"""
+    global current_period_combo_tag, current_interval_combo_tag
+
     print("Plus button clicked!")
+
+    # Get current period and interval from dropdowns
+    period = "1y"  # Default fallback
+    interval = "1d"  # Default fallback
+
+    try:
+        if current_period_combo_tag and dpg.does_item_exist(current_period_combo_tag):
+            period = dpg.get_value(current_period_combo_tag)
+        if current_interval_combo_tag and dpg.does_item_exist(current_interval_combo_tag):
+            interval = dpg.get_value(current_interval_combo_tag)
+
+        # Validate the combination
+        period, interval = validate_period_interval_combination(period, interval)
+        print(f"📊 Using period: {period}, interval: {interval} for new stock")
+
+    except Exception as e:
+        print(f"⚠️ Error getting period/interval, using defaults: {e}")
+
     create_stock_search(
-    mode="chart",
-    line_tag=current_stock_line_tag,
-    x_axis_tag=current_x_axis_tag,
-    y_axis_tag=current_y_axis_tag,
-    plot_tag=current_plot_tag
-)
+        mode="chart",
+        line_tag=current_stock_line_tag,
+        x_axis_tag=current_x_axis_tag,
+        y_axis_tag=current_y_axis_tag,
+        plot_tag=current_plot_tag,
+        period=period,
+        interval=interval
+    )
 
 def fav_button_callback():
     """Heart button callback"""
@@ -462,6 +605,168 @@ def go_to_welcome():
     print("Going back to welcome page")
     from containers.container_content import show_page
     show_page("welcome")
+
+def validate_period_interval_combination(period, interval):
+    """
+    Validate and auto-correct period/interval combinations
+    Ensures: Interval Cannot be bigger than Period
+
+    Args:
+        period (str): The range of the price data to retrieve
+        valid values are "1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"
+
+        interval (str): The granularity of the data to retrieve (interval)
+        valid values are "1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h", "1d", "5d", "1wk", "1mo", "3mo"
+
+    Returns:
+        tuple: (corrected_period, corrected_interval)
+    """
+    # Convert periods and intervals to minutes for comparison
+    time_to_minutes = {
+        # Intervals
+        "1m": 1, "2m": 2, "5m": 5, "15m": 15, "30m": 30,
+        "60m": 60, "90m": 90, "1h": 60,
+        "1d": 1440, "5d": 7200, "1wk": 10080, "1mo": 43200, "3mo": 129600,
+        # Periods (approximate durations)
+        "1d": 1440,      # 1 day = 1440 minutes
+        "5d": 7200,      # 5 days = 7200 minutes
+        "1mo": 43200,    # 1 month = 30 days = 43200 minutes
+        "3mo": 129600,   # 3 months = 90 days = 129600 minutes
+        "6mo": 259200,   # 6 months = 180 days = 259200 minutes
+        "1y": 525600,    # 1 year = 365 days = 525600 minutes
+        "2y": 1051200,   # 2 years = 730 days = 1051200 minutes
+        "5y": 2628000,   # 5 years = 1825 days = 2628000 minutes
+        "10y": 5256000,  # 10 years = 3650 days = 5256000 minutes
+        "ytd": 262800,   # YTD = ~6 months = 262800 minutes
+        "max": 10512000  # Max = ~20 years = 10512000 minutes
+    }
+
+    # Define period to minimum interval mapping (API limitations)
+    period_min_intervals = {
+        "1d": "1m",     # 1 day can use minute intervals
+        "5d": "1m",     # 5 days can use minute intervals
+        "1mo": "30m",   # 1 month minimum 30min
+        "3mo": "1h",    # 3 months minimum 1 hour
+        "6mo": "1d",    # 6 months minimum 1 day
+        "1y": "1d",     # 1 year minimum 1 day
+        "2y": "1d",     # 2 years minimum 1 day
+        "5y": "1wk",    # 5 years minimum 1 week
+        "10y": "1wk",   # 10 years minimum 1 week
+        "ytd": "1d",    # Year to date minimum 1 day
+        "max": "1wk"    # Max period minimum 1 week
+    }
+
+    period_minutes = time_to_minutes.get(period, 525600)  # Default to 1 year
+    interval_minutes = time_to_minutes.get(interval, 1440)  # Default to 1 day
+
+    # Rule 1: Interval Cannot be bigger than Period
+    if interval_minutes > period_minutes:
+        # Find the largest valid interval that's smaller than or equal to period
+        valid_intervals = ["1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h", "1d", "5d", "1wk", "1mo", "3mo"]
+        corrected_interval = "1d"  # Default fallback
+
+        for valid_interval in reversed(valid_intervals):  # Start from largest
+            if time_to_minutes.get(valid_interval, 1440) <= period_minutes:
+                corrected_interval = valid_interval
+                break
+
+        print(f"⚠️ Interval {interval} is bigger than period {period}! Auto-corrected to {corrected_interval}")
+        interval = corrected_interval
+        interval_minutes = time_to_minutes.get(interval, 1440)
+
+    # Rule 2: Check API minimum interval requirements
+    min_interval = period_min_intervals.get(period, "1d")
+    min_interval_mins = time_to_minutes.get(min_interval, 1440)
+
+    if interval_minutes < min_interval_mins:
+        corrected_interval = min_interval
+        print(f"⚠️ Auto-corrected interval from {interval} to {corrected_interval} (API minimum for period {period})")
+        return period, corrected_interval
+
+    return period, interval
+
+def on_period_interval_change(sender, app_data, user_data):
+    """Callback when period or interval dropdown changes"""
+    global current_period_combo_tag, current_interval_combo_tag
+
+    try:
+        # Get current values from both dropdowns
+        if current_period_combo_tag and current_interval_combo_tag:
+            period = dpg.get_value(current_period_combo_tag)
+            interval = dpg.get_value(current_interval_combo_tag)
+
+            # Validate the combination
+            corrected_period, corrected_interval = validate_period_interval_combination(period, interval)
+
+            # If interval was auto-corrected, update the dropdown immediately
+            if corrected_interval != interval:
+                print(f"🔄 Auto-updating interval dropdown from {interval} to {corrected_interval}")
+                dpg.set_value(current_interval_combo_tag, corrected_interval)
+                print(f"✅ Corrected combination: {period} + {corrected_interval}")
+            else:
+                print(f"✅ Valid combination: {period} + {interval}")
+
+    except Exception as e:
+        print(f"⚠️ Error validating period/interval: {e}")
+
+def apply_period_interval_changes():
+    """Apply the selected period and interval to refresh all stocks"""
+    global current_period_combo_tag, current_interval_combo_tag
+
+    try:
+        if not current_period_combo_tag or not current_interval_combo_tag:
+            print("❌ Dropdown tags not found")
+            return
+
+        period = dpg.get_value(current_period_combo_tag)
+        interval = dpg.get_value(current_interval_combo_tag)
+
+        # Validate and auto-correct the combination
+        corrected_period, corrected_interval = validate_period_interval_combination(period, interval)
+
+        # Update the UI if correction was made
+        if corrected_interval != interval:
+            dpg.set_value(current_interval_combo_tag, corrected_interval)
+            interval = corrected_interval
+
+        print(f"🔄 Applying period: {period}, interval: {interval}")
+
+        # Get all active stock tags
+        from components.stock.stock_data_manager import get_all_stock_tags
+        stock_tags = get_all_stock_tags()
+
+        if not stock_tags:
+            print("📋 No stocks to refresh with new parameters")
+            return
+
+        # Refresh each stock with new period/interval
+        for tag in stock_tags:
+            try:
+                print(f"🔄 Refreshing {tag.symbol} with {period}/{interval}")
+
+                # Fetch new data with updated parameters
+                fetch_stock_data(
+                    tag.symbol,
+                    current_stock_line_tag,
+                    current_x_axis_tag,
+                    current_y_axis_tag,
+                    current_plot_tag,
+                    period=period,
+                    interval=interval
+                )
+
+                time.sleep(0.5)  # Small delay between requests
+
+            except Exception as e:
+                print(f"❌ Error refreshing {tag.symbol}: {e}")
+
+        # Refresh the table to show updated data
+        refresh_table_data()
+
+        print(f"✅ Applied {period}/{interval} to {len(stock_tags)} stocks")
+
+    except Exception as e:
+        print(f"❌ Error applying period/interval changes: {e}")
 
 # Keep the old function for backward compatibility
 def create_graph_table_page(parent_tag):

@@ -154,9 +154,9 @@ def _fetch_and_plot_mom(symbol, momentum_line_tag, x_axis_tag, y_axis_tag, plot_
             dpg.configure_item(status_tag, color=[255, 255, 0])
         
         # Try to get cached data first
-        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.")
-        
-        if stock_data and stock_data.price_history is not None and not stock_data.price_history.empty and stock_data.is_cache_valid():
+        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.", period="1y", interval="1d")
+
+        if stock_data and stock_data.price_history is not None and not stock_data.price_history.empty and stock_data.is_cache_valid("1y", "1d"):
             print(f"📦 Using cached data for {symbol} Momentum calculation")
             _process_mom_data(stock_data.price_history, symbol, momentum_line_tag, x_axis_tag, y_axis_tag, plot_tag, status_tag)
         else:
@@ -183,11 +183,11 @@ def _wait_for_cache_and_process_momentum(symbol, momentum_line_tag, x_axis_tag, 
         start_time = time.time()
         
         while time.time() - start_time < max_wait:
-            stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.")
-            
-            if (stock_data and stock_data.price_history is not None 
-                and not stock_data.price_history.empty 
-                and stock_data.is_cache_valid()):
+            stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.", period="1y", interval="1d")
+
+            if (stock_data and stock_data.price_history is not None
+                and not stock_data.price_history.empty
+                and stock_data.is_cache_valid("1y", "1d")):
                 if constants.DEBUG:
                     print(f"✅ Cache updated for {symbol}, processing Momentum")
                 _process_mom_data(stock_data.price_history, symbol, momentum_line_tag, x_axis_tag, y_axis_tag, plot_tag, status_tag)
@@ -198,7 +198,7 @@ def _wait_for_cache_and_process_momentum(symbol, momentum_line_tag, x_axis_tag, 
         # Timeout
         if constants.DEBUG:
             print(f"⚠️ Timeout waiting for {symbol} data, using available data")
-        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.")
+        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.", period="1y", interval="1d")
         if stock_data and stock_data.price_history is not None:
             _process_mom_data(stock_data.price_history, symbol, momentum_line_tag, x_axis_tag, y_axis_tag, plot_tag, status_tag)
         else:

@@ -83,8 +83,8 @@ def fetch_stock_data(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag, period=
                     # Signal all other threads to stop
                     stop_flag.set()
                     
-                    # Process the complete result
-                    _process_complete_result(symbol, result, source_name, line_tag, x_axis_tag, y_axis_tag, plot_tag)
+                    # Process the complete result with period/interval metadata
+                    _process_complete_result(symbol, result, source_name, line_tag, x_axis_tag, y_axis_tag, plot_tag, period, interval)
                     
                     # Clean up
                     if symbol in active_fetches:
@@ -136,6 +136,13 @@ def _fetch_yfinance_complete(symbol, yperiod, yinterval, stop_flag):
         print(f"🔄 Getting fundamentals for {symbol}")
         try:
             info = ticker.info
+            # print(f"📊 yfinance info keys available: {list(info.keys()) if info else 'None'}")
+            # Log key fundamental fields for debugging
+            debug_fields = ['totalRevenue', 'revenue', 'marketCap', 'netIncomeToCommon', 'netIncome',
+                          'operatingCashflow', 'freeCashflow', 'volume', 'averageVolume']
+            for field in debug_fields:
+                if field in info:
+                    print(f"📊 {field}: {info[field]}")
         except Exception as e:
             print(f"⚠️ Could not get info for {symbol}: {e}")
             info = {}
@@ -466,38 +473,44 @@ def _fetch_stockdex_complete(symbol, yperiod, yinterval, stop_flag):
 # PROCESSING AND CACHING
 # =============================================================================
 
-def _process_complete_result(symbol, data, source_name, line_tag, x_axis_tag, y_axis_tag, plot_tag):
+def _process_complete_result(symbol, data, source_name, line_tag, x_axis_tag, y_axis_tag, plot_tag, period="1d", interval="5m"):
     """Process complete result with both price and fundamental data"""
     print(f"🎯 Processing complete result from {source_name} for {symbol}")
-    
+    print(f"🔍 DEBUG: Using period={period}, interval={interval} for caching")
+
     # 1. Update chart immediately with price data
     _update_chart_with_data(data, line_tag, x_axis_tag, y_axis_tag, plot_tag)
-    
+
     # 2. Convert to DataFrame for caching
     df = _convert_price_to_dataframe(data)
-    
+
     # 3. Extract fundamentals
     fundamentals = _extract_fundamentals_from_data(data)
-    
-    # 4. Cache everything at once
-    _cache_complete_data(symbol, df, fundamentals)
-    
+
+    # 4. Cache everything at once with period/interval metadata
+    _cache_complete_data(symbol, df, fundamentals, period, interval)
+
     # 5. Add to table with complete data
     _add_to_portfolio_table_direct(symbol)
-    
+
     # 6. Update request tracking
     global last_request_time
     last_request_time = time.time()
-    
+
     print(f"✅ Complete processing finished for {symbol} from {source_name}")
 
-def _cache_complete_data(symbol, price_df, fundamentals):
+def _cache_complete_data(symbol, price_df, fundamentals, period="1d", interval="5m"):
     """Cache complete data (price + fundamentals) in one operation"""
     try:
-        from components.stock.stock_data_manager import stock_data_cache, StockData
-        
-        # Create comprehensive stock data object
-        stock_data = StockData(symbol=symbol, company_name=fundamentals.get('company_name', f"{symbol} Corp."))
+        from components.stock.stock_data_manager import update_stock_data_cache, StockData
+
+        # Create comprehensive stock data object with period/interval metadata
+        stock_data = StockData(
+            symbol=symbol,
+            company_name=fundamentals.get('company_name', f"{symbol} Corp."),
+            period=period,
+            interval=interval
+        )
         
         # Update price data
         stock_data.last_updated = time.time()
@@ -520,22 +533,34 @@ def _cache_complete_data(symbol, price_df, fundamentals):
         # Update fundamental data
         if 'revenue' in fundamentals and fundamentals['revenue']:
             stock_data.revenue = fundamentals['revenue']
-        
+            print(f"💰 Set revenue for {symbol}: {stock_data.revenue}")
+
         if 'net_income' in fundamentals and fundamentals['net_income']:
             stock_data.net_income = fundamentals['net_income']
-        
+            print(f"📈 Set net_income for {symbol}: {stock_data.net_income}")
+
         if 'cash_flow' in fundamentals and fundamentals['cash_flow']:
             stock_data.cash_flow = fundamentals['cash_flow']
-        
+            print(f"💵 Set cash_flow for {symbol}: {stock_data.cash_flow}")
+
         if 'market_cap' in fundamentals and fundamentals['market_cap']:
             stock_data.market_cap = fundamentals['market_cap']
+            print(f"🏢 Set market_cap for {symbol}: {stock_data.market_cap}")
         
-        # Update cache
-        stock_data_cache[symbol] = stock_data
-        
+        # Update cache using the new compound key system
+        update_stock_data_cache(symbol, stock_data, period, interval)
+
         # Update stock tag if it exists
         _update_stock_tag_cache(symbol, stock_data)
-        
+
+        # Save cache to file to persist the fundamental data
+        try:
+            from components.stock.stock_data_manager import save_cache_to_file
+            save_cache_to_file()
+            print(f"💾 Cache saved to file after updating {symbol}")
+        except Exception as e:
+            print(f"❌ Error saving cache to file: {e}")
+
         fund_summary = [k for k, v in fundamentals.items() if v] or ['none']
         print(f"✅ Complete data cached for {symbol}: price + fundamentals: {fund_summary}")
         
@@ -791,16 +816,22 @@ def _extract_volume_from_cache(price_df, stock_data):
     """Extract volume from DataFrame"""
     try:
         if 'volume' not in price_df.columns:
+            print(f"⚠️ No volume column in price_df for {stock_data.symbol}")
             return
-        
+
+        print(f"📊 Volume data available for {stock_data.symbol}, checking for non-zero values...")
+
         # Get the latest non-zero volume
         volume_series = price_df['volume']
         for i in range(len(volume_series) - 1, -1, -1):
             vol = volume_series.iloc[i]
             if vol > 0:
                 stock_data.volume = int(vol)
+                print(f"📊 Set volume for {stock_data.symbol}: {stock_data.volume}")
                 break
-                
+        else:
+            print(f"⚠️ No non-zero volume found for {stock_data.symbol}")
+
     except Exception as e:
         print(f"⚠️ Could not extract volume: {e}")
 

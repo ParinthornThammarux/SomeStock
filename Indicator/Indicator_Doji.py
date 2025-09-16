@@ -71,7 +71,7 @@ def _fetch_and_plot_doji(symbol, candle_tag, marker_tag, x_axis_tag, y_axis_tag,
             dpg.set_value(status_tag, "Checking cache...")
             dpg.configure_item(status_tag, color=[255, 255, 0])
 
-        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.")
+        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.", "1y", "1d")
 
         if stock_data and stock_data.price_history is not None and not stock_data.price_history.empty and stock_data.is_cache_valid():
             print(f"📦 Using cached data for {symbol} doji detection")
@@ -97,7 +97,7 @@ def _wait_for_cache_and_process_doji(symbol, candle_tag, marker_tag, x_axis_tag,
         start_time = time.time()
 
         while time.time() - start_time < max_wait:
-            stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.")
+            stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.", "1y", "1d")
 
             if (stock_data and stock_data.price_history is not None 
                 and not stock_data.price_history.empty 
@@ -111,7 +111,7 @@ def _wait_for_cache_and_process_doji(symbol, candle_tag, marker_tag, x_axis_tag,
 
         if constants.DEBUG:
             print(f"⚠️ Timeout waiting for {symbol} data, using available data")
-        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.")
+        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.", "1y", "1d")
         if stock_data and stock_data.price_history is not None:
             _process_doji_data(stock_data.price_history, symbol, candle_tag, marker_tag, x_axis_tag, y_axis_tag, plot_tag, status_tag)
         else:

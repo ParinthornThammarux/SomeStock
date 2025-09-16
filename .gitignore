@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 
 favorite_stocks.json
+.claude
 
 # C extensions
 *.so
@@ -198,4 +199,8 @@ cython_debug/
 
 registered_users/
 registered_users/*
-cache
+
+# Runtime cache files
+cache/
+cache/*
+stock_cache.json

@@ -5,6 +5,7 @@ from utils import constants
 import random
 import time
 import json
+import os
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, Callable
 import pandas as pd
@@ -15,7 +16,8 @@ import pandas as pd
 
 # Cache configuration
 CACHE_DURATION = 60 * 10  # 10 minutes in seconds
-MAX_CACHE_SIZE = 100  # Maximum number of stocks to cache
+MAX_CACHE_SIZE = 10000  # Maximum number of stocks to cache
+CACHE_BASE_DIR = "cache"  # Base cache directory
 
 # Color pairs for stock tags
 COLOR_PAIRS = [
@@ -76,12 +78,25 @@ class StockData:
     # Metadata
     last_updated: Optional[float] = None
     data_source: str = "api"
+    period: Optional[str] = None
+    interval: Optional[str] = None
     
-    def is_cache_valid(self) -> bool:
-        """Check if cached data is still valid"""
+    def is_cache_valid(self, period: Optional[str] = None, interval: Optional[str] = None) -> bool:
+        """Check if cached data is still valid and matches requested parameters"""
         if self.last_updated is None:
             return False
-        return (time.time() - self.last_updated) < CACHE_DURATION
+
+        # Check if cache is within time limit
+        if (time.time() - self.last_updated) >= CACHE_DURATION:
+            return False
+
+        # Check period/interval compatibility if specified
+        if period is not None and self.period != period:
+            return False
+        if interval is not None and self.interval != interval:
+            return False
+
+        return True
     
     def get_cache_status(self) -> str:
         """Get human-readable cache status"""
@@ -110,7 +125,9 @@ class StockData:
             'market_cap': self.market_cap,
             'pe_ratio': self.pe_ratio,
             'last_updated': self.last_updated,
-            'data_source': self.data_source
+            'data_source': self.data_source,
+            'period': self.period,
+            'interval': self.interval
         }
         
         # Handle price_history DataFrame
@@ -137,7 +154,9 @@ class StockData:
             market_cap=data.get('market_cap'),
             pe_ratio=data.get('pe_ratio'),
             last_updated=data.get('last_updated'),
-            data_source=data.get('data_source', 'api')
+            data_source=data.get('data_source', 'api'),
+            period=data.get('period'),
+            interval=data.get('interval')
         )
         
         # Handle price_history DataFrame
@@ -318,7 +337,7 @@ class StockTag:
     
     def refresh_data(self):
         """Refresh stock data from API"""
-        print(f"🔄 Refreshing data for {self.symbol}...")
+        print(f"[REFRESH] Refreshing data for {self.symbol}...")
         try:
             # Get current chart tags
             from components.graph.graph_dpg import current_stock_line_tag, current_x_axis_tag, current_y_axis_tag, current_plot_tag
@@ -334,19 +353,19 @@ class StockTag:
                     current_plot_tag
                 )
             else:
-                print(f"❌ Chart tags not available for {self.symbol}")
+                print(f"[ERROR] Chart tags not available for {self.symbol}")
             
             # Update cache indicator after refresh
             self.update_cache_indicator()
             
         except Exception as e:
-            print(f"❌ Error refreshing {self.symbol}: {e}")
+            print(f"[ERROR] Error refreshing {self.symbol}: {e}")
     
     def load_chart_from_cache(self):
         """Load chart data from cached DataFrame"""
         try:
             if self.stock_data.price_history is None:
-                print(f"❌ No cached chart data for {self.symbol}")
+                print(f"[ERROR] No cached chart data for {self.symbol}")
                 return False
             
             # Import the chart update function
@@ -370,11 +389,11 @@ class StockTag:
             return True
             
         except Exception as e:
-            print(f"❌ Error loading chart from cache: {e}")
+            print(f"[ERROR] Error loading chart from cache: {e}")
             return False
                 
         except Exception as e:
-            print(f"❌ Error loading chart from cache: {e}")
+            print(f"[ERROR] Error loading chart from cache: {e}")
             return False
     
     def toggle_favorite(self):
@@ -386,7 +405,7 @@ class StockTag:
         if dpg.does_item_exist(f"{self.tag_id}_heart"):
             dpg.set_item_label(f"{self.tag_id}_heart", heart_icon)
         
-        print(f"{'⭐' if self.is_favorited else '💔'} {self.symbol} favorite: {self.is_favorited}")
+        print(f"[{'STAR' if self.is_favorited else 'UNSTAR'}] {self.symbol} favorite: {self.is_favorited}")
         
         # Call callback if provided
         if self.on_favorite:
@@ -428,7 +447,7 @@ class StockTag:
         if dpg.does_item_exist(self.tag_id):
             dpg.delete_item(self.tag_id)
         
-        print(f"🗑️ Removed {self.symbol} tag")
+        print(f"[REMOVE] Removed {self.symbol} tag")
         
         # Call callback if provided
         if self.on_remove:
@@ -450,10 +469,10 @@ class StockTag:
         else:
             # Default behavior: try to load chart
             if not self.stock_data.is_cache_valid():
-                print(f"🔄 Cache expired for {self.symbol}, fetching fresh data...")
+                print(f"[CACHE] Cache expired for {self.symbol}, fetching fresh data...")
                 self.refresh_data()
             else:
-                print(f"📦 Using cached data for {self.symbol}")
+                print(f"[CACHE] Using cached data for {self.symbol}")
                 self.load_chart_from_cache()
                 
     def _on_heart_clicked(self):
@@ -489,26 +508,58 @@ _stock_data_cache: Dict[str, StockData] = {}
 _active_tags = []
 _focused_tag: Optional[StockTag] = None
 
-def get_cached_stock_data(symbol: str, company_name: str) -> StockData:
+def _generate_cache_key(symbol: str, period: Optional[str] = None, interval: Optional[str] = None) -> str:
+    """Generate cache key that includes period and interval"""
+    # Use default values for backward compatibility
+    period = period or "1d"
+    interval = interval or "5m"
+    return f"{symbol.upper()}_{period}_{interval}"
+
+def get_cached_stock_data(symbol: str, company_name: str, period: Optional[str] = None, interval: Optional[str] = None) -> StockData:
     """Get cached stock data or create new entry"""
-    if symbol in _stock_data_cache:
-        cached_data = _stock_data_cache[symbol]
-        if cached_data.is_cache_valid():
-            print(f"📦 Using cached data for {symbol}")
+    cache_key = _generate_cache_key(symbol, period, interval)
+
+    # First check in-memory cache
+    if cache_key in _stock_data_cache:
+        cached_data = _stock_data_cache[cache_key]
+        if cached_data.is_cache_valid(period, interval):
+            print(f"🔄 Using in-memory cached data for {symbol} ({period}/{interval})")
             return cached_data
         else:
-            print(f"⏰ Cache expired for {symbol}")
-    
-    # Create new stock data entry
-    stock_data = StockData(symbol=symbol, company_name=company_name)
-    _stock_data_cache[symbol] = stock_data
-    
+            print(f"⏰ In-memory cache expired for {symbol} ({period}/{interval})")
+
+    # Try loading from hierarchical cache if not in memory or expired
+    if period and interval:
+        hierarchical_data = load_individual_cache(symbol, company_name, period, interval)
+        if hierarchical_data and hierarchical_data.is_cache_valid(period, interval):
+            # Add to in-memory cache for faster future access
+            _stock_data_cache[cache_key] = hierarchical_data
+            print(f"📁 Loaded valid data from hierarchical cache: {symbol} ({period}/{interval})")
+            return hierarchical_data
+        elif hierarchical_data:
+            print(f"⏰ Hierarchical cache expired for {symbol} ({period}/{interval})")
+
+    # Create new stock data entry with period/interval metadata
+    print(f"🆕 Creating new empty cache entry: {cache_key} (period={period}, interval={interval})")
+    stock_data = StockData(
+        symbol=symbol,
+        company_name=company_name,
+        period=period or "1d",
+        interval=interval or "5m"
+    )
+    _stock_data_cache[cache_key] = stock_data
+
     return stock_data
 
-def update_stock_data_cache(symbol: str, stock_data: StockData):
+def update_stock_data_cache(symbol: str, stock_data: StockData, period: Optional[str] = None, interval: Optional[str] = None):
     """Update the cache with fresh stock data"""
-    _stock_data_cache[symbol] = stock_data
-    
+    cache_key = _generate_cache_key(symbol, period, interval)
+    print(f"🔄 Updating cache: {cache_key} with last_updated={stock_data.last_updated}")
+    _stock_data_cache[cache_key] = stock_data
+
+    # Also save immediately to hierarchical structure
+    save_individual_cache(cache_key, stock_data)
+
     # Update any active tags for this symbol
     for tag in _active_tags:
         if tag.symbol == symbol:
@@ -517,10 +568,27 @@ def update_stock_data_cache(symbol: str, stock_data: StockData):
 
 def get_stock_data_for_table(symbol: str) -> Dict[str, Any]:
     """Get formatted stock data for table display"""
-    if symbol not in _stock_data_cache:
+    # Find the most recent data for this symbol across all period/interval combinations
+    symbol_data = None
+    latest_timestamp = 0
+    selected_period = None
+    selected_interval = None
+
+    for cache_key, cached_data in _stock_data_cache.items():
+        if cache_key.startswith(f"{symbol.upper()}_") and cached_data.last_updated:
+            if cached_data.last_updated > latest_timestamp:
+                latest_timestamp = cached_data.last_updated
+                symbol_data = cached_data
+                # Extract period and interval from cache key
+                parts = cache_key.split('_')
+                if len(parts) >= 3:
+                    selected_period = parts[1]
+                    selected_interval = parts[2]
+
+    if not symbol_data:
         return {}
-    
-    data = _stock_data_cache[symbol]
+
+    data = symbol_data
     
     # Format volume
     volume_str = "N/A"
@@ -551,59 +619,160 @@ def get_stock_data_for_table(symbol: str) -> Dict[str, Any]:
         'revenue': data.revenue or "N/A",
         'net_income': data.net_income or "N/A",
         'cash_flow': data.cash_flow or "N/A",
-        'is_cached': data.is_cache_valid(),
+        'is_cached': data.is_cache_valid(selected_period, selected_interval),
         'cache_status': data.get_cache_status()
     }
+
+# =============================================================================
+# HIERARCHICAL CACHE HELPERS
+# =============================================================================
+
+def get_cache_path(symbol, company_name, period, interval):
+    """Get the hierarchical cache file path for a stock"""
+    # Clean company name for folder (remove special characters)
+    clean_company = "".join(c for c in company_name if c.isalnum() or c in (' ', '-', '_')).strip()
+    clean_company = clean_company.replace(' ', '_')[:20]  # Limit length
+
+    # Create path: cache/Symbol/CompanyName/SYMBOL_period_interval.json
+    symbol_dir = os.path.join(CACHE_BASE_DIR, "Symbol", clean_company)
+    filename = f"{symbol}_{period}_{interval}.json"
+    return symbol_dir, os.path.join(symbol_dir, filename)
+
+def save_individual_cache(cache_key, stock_data):
+    """Save individual stock cache to hierarchical structure"""
+    try:
+        # Parse cache key: SYMBOL_period_interval
+        parts = cache_key.split('_')
+        if len(parts) < 3:
+            print(f"[CACHE] Invalid cache key format: {cache_key}")
+            return False
+
+        symbol = parts[0]
+        period = parts[1]
+        interval = parts[2]
+
+        # Get company name from stock data
+        company_name = stock_data.company_name or f"{symbol} Corp."
+
+        # Get cache path
+        cache_dir, cache_path = get_cache_path(symbol, company_name, period, interval)
+
+        # Create directory structure
+        os.makedirs(cache_dir, exist_ok=True)
+
+        # Save stock data
+        data_dict = stock_data.to_dict()
+        with open(cache_path, 'w') as f:
+            json.dump(data_dict, f, indent=2)
+
+        print(f"📁 Saved {cache_key} to {cache_path}")
+        return True
+
+    except Exception as e:
+        print(f"❌ Error saving individual cache for {cache_key}: {e}")
+        return False
+
+def load_individual_cache(symbol, company_name, period, interval):
+    """Load individual stock cache from hierarchical structure"""
+    try:
+        cache_dir, cache_path = get_cache_path(symbol, company_name, period, interval)
+
+        if not os.path.exists(cache_path):
+            return None
+
+        with open(cache_path, 'r') as f:
+            data_dict = json.load(f)
+
+        # Create StockData object
+        stock_data = StockData.from_dict(data_dict)
+        print(f"📁 Loaded {symbol}_{period}_{interval} from {cache_path}")
+        return stock_data
+
+    except Exception as e:
+        print(f"❌ Error loading individual cache for {symbol}_{period}_{interval}: {e}")
+        return None
+
 
 # =============================================================================
 # PERSISTENCE
 # =============================================================================
 
 def save_cache_to_file():
-    """Save cache to file for persistence"""
+    """Save cache using hierarchical folder structure"""
     try:
-        cache_data = {}
-        for symbol, stock_data in _stock_data_cache.items():
-            cache_data[symbol] = stock_data.to_dict()
-        
-        with open('stock_cache.json', 'w') as f:
-            json.dump(cache_data, f, indent=2)
-        
-        print(f"💾 Saved cache for {len(cache_data)} stocks")
-        
+        print(f"📁 Saving {len(_stock_data_cache)} cache entries to hierarchical structure...")
+        saved_count = 0
+
+        for cache_key, stock_data in _stock_data_cache.items():
+            if save_individual_cache(cache_key, stock_data):
+                saved_count += 1
+
+        print(f"✅ Saved {saved_count}/{len(_stock_data_cache)} cache entries to hierarchical structure")
+
     except Exception as e:
-        print(f"❌ Error saving cache: {e}")
+        print(f"❌ Error saving hierarchical cache: {e}")
 
 def load_cache_from_file():
-    """Load cache from file"""
+    """Load cache from hierarchical folder structure"""
     try:
-        with open('stock_cache.json', 'r') as f:
-            cache_data = json.load(f)
-        
         global _stock_data_cache
-        for symbol, data in cache_data.items():
-            _stock_data_cache[symbol] = StockData.from_dict(data)
-        
-        print(f"📂 Loaded cache for {len(cache_data)} stocks")
-        
-    except FileNotFoundError:
-        print("📂 No cache file found, starting fresh")
+
+        # First, try to load from hierarchical structure
+        cache_symbol_dir = os.path.join(CACHE_BASE_DIR, "Symbol")
+
+        if os.path.exists(cache_symbol_dir):
+            print(f"📁 Loading cache from hierarchical structure...")
+            loaded_count = 0
+
+            # Walk through all company folders
+            for company_folder in os.listdir(cache_symbol_dir):
+                company_path = os.path.join(cache_symbol_dir, company_folder)
+                if not os.path.isdir(company_path):
+                    continue
+
+                # Load all cache files in this company folder
+                for filename in os.listdir(company_path):
+                    if not filename.endswith('.json'):
+                        continue
+
+                    filepath = os.path.join(company_path, filename)
+                    try:
+                        with open(filepath, 'r') as f:
+                            data_dict = json.load(f)
+
+                        # Extract cache key from filename (remove .json)
+                        cache_key = filename[:-5]  # Remove .json extension
+                        _stock_data_cache[cache_key] = StockData.from_dict(data_dict)
+
+                        # Debug log
+                        fundamentals = {k: v for k, v in data_dict.items() if k in ['revenue', 'net_income', 'cash_flow', 'volume', 'change']}
+                        print(f"📁 Loaded {cache_key}: fundamentals = {fundamentals}")
+                        loaded_count += 1
+
+                    except Exception as e:
+                        print(f"❌ Error loading {filepath}: {e}")
+
+            print(f"✅ Loaded {loaded_count} cache entries from hierarchical structure")
+
+        else:
+            print("📁 No hierarchical cache found, starting fresh")
+
     except Exception as e:
         print(f"❌ Error loading cache: {e}")
 
 def cleanup_cache():
     """Clean up old cache entries"""
     global _stock_data_cache
-    
+
     # Remove expired entries
     expired_keys = [
-        symbol for symbol, data in _stock_data_cache.items()
+        cache_key for cache_key, data in _stock_data_cache.items()
         if not data.is_cache_valid()
     ]
-    
+
     for key in expired_keys:
         del _stock_data_cache[key]
-    
+
     # Limit cache size
     if len(_stock_data_cache) > MAX_CACHE_SIZE:
         # Remove oldest entries
@@ -611,12 +780,12 @@ def cleanup_cache():
             _stock_data_cache.items(),
             key=lambda x: x[1].last_updated or 0
         )
-        
+
         items_to_remove = len(_stock_data_cache) - MAX_CACHE_SIZE
         for i in range(items_to_remove):
             del _stock_data_cache[sorted_items[i][0]]
-    
-    print(f"🧹 Cache cleanup complete, {len(_stock_data_cache)} entries remaining")
+
+    print(f"[CACHE] Cache cleanup complete, {len(_stock_data_cache)} entries remaining")
 
 # =============================================================================
 # PUBLIC API FUNCTIONS
@@ -653,14 +822,14 @@ def create_stock_tag(symbol: str, company_name: str, parent: str = "tags_contain
             symbol=symbol,
             parent=parent,
             company_name=company_name,
-            on_favorite=lambda sym, fav: print(f"⭐ {sym} favorited: {fav}"),
-            on_remove=lambda sym: print(f"🗑️ {sym} removed")
+            on_favorite=lambda sym, fav: print(f"[STAR] {sym} favorited: {fav}"),
+            on_remove=lambda sym: print(f"[REMOVE] {sym} removed")
         )
-        print(f"✅ Created new stock tag: {symbol}")
+        print(f"[SUCCESS] Created new stock tag: {symbol}")
         return tag
         
     except Exception as e:
-        print(f"❌ Error creating tag for {symbol}: {e}")
+        print(f"[ERROR] Error creating tag for {symbol}: {e}")
         return None
 
 def get_all_active_tags() -> list:
@@ -692,11 +861,11 @@ def clear_all_tags():
         tag.remove()
     
     _active_tags.clear()
-    print("🧹 Cleared all stock tags")
+    print("[CLEAR] Cleared all stock tags")
 
 def refresh_all_tags():
     """Refresh data for all active tags"""
-    print(f"🔄 Refreshing {len(_active_tags)} stock tags...")
+    print(f"[REFRESH] Refreshing {len(_active_tags)} stock tags...")
     for tag in _active_tags:
         tag.refresh_data()
 

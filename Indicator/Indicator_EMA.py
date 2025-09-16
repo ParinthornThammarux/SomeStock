@@ -158,7 +158,7 @@ def _fetch_and_plot_ema(symbol, price_line_tag, ema12_line_tag, ema26_line_tag, 
             dpg.configure_item(status_tag, color=[255, 255, 0])
         
         # Try to get cached data first
-        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.")
+        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.", "1y", "1d")
         
         if stock_data and stock_data.price_history is not None and not stock_data.price_history.empty and stock_data.is_cache_valid():
             print(f"📦 Using cached data for {symbol} EMA calculation")
@@ -187,7 +187,7 @@ def _wait_for_cache_and_process_ema(symbol, price_line_tag, ema12_line_tag, ema2
         start_time = time.time()
         
         while time.time() - start_time < max_wait:
-            stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.")
+            stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.", "1y", "1d")
             
             if (stock_data and stock_data.price_history is not None 
                 and not stock_data.price_history.empty 
@@ -202,7 +202,7 @@ def _wait_for_cache_and_process_ema(symbol, price_line_tag, ema12_line_tag, ema2
         # Timeout
         if constants.DEBUG:
             print(f"⚠️ Timeout waiting for {symbol} data, using available data")
-        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.")
+        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.", "1y", "1d")
         if stock_data and stock_data.price_history is not None:
             _process_ema_data(stock_data.price_history, symbol, price_line_tag, ema12_line_tag, ema26_line_tag, x_axis_tag, y_axis_tag, plot_tag, status_tag)
         else:
@@ -401,7 +401,7 @@ def get_ema_crossover_for_symbol(symbol, period_fast=12, period_slow=26):
         tuple: (ema12, ema26, signal, crossovers_count)
     """
     try:
-        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.")
+        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.", "1y", "1d")
         if stock_data and stock_data.price_history is not None:
             close_prices = stock_data.price_history['close'].dropna()
             if len(close_prices) >= max(period_fast, period_slow) + 1:

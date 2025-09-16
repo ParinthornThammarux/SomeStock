@@ -97,7 +97,7 @@ def _fetch_and_predict_simple(symbol, chart_tags):
             dpg.configure_item(status_tag, color=[255, 255, 0])
         
         # Get cached data
-        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.")
+        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.", "1y", "1d")
         
         if stock_data and stock_data.price_history is not None and not stock_data.price_history.empty and stock_data.is_cache_valid():
             print(f"📦 Using cached data for {symbol} prediction")
@@ -129,7 +129,7 @@ def _wait_for_cache_and_predict_simple(symbol, chart_tags, max_wait=30):
         
         while time.time() - start_time < max_wait:
             # Check if cache has been updated with fresh data
-            stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.")
+            stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.", "1y", "1d")
             
             if (stock_data and stock_data.price_history is not None 
                 and not stock_data.price_history.empty 
@@ -144,7 +144,7 @@ def _wait_for_cache_and_predict_simple(symbol, chart_tags, max_wait=30):
         
         # Timeout - try with whatever data we have
         print(f"⚠️ Timeout waiting for {symbol} data, using available data")
-        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.")
+        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.", "1y", "1d")
         if stock_data and stock_data.price_history is not None:
             _process_simple_prediction(stock_data.price_history, symbol, chart_tags)
         else:
@@ -279,7 +279,7 @@ def predict_next_price(symbol, window_size=10, verbose=True):
     """
     try:
         # Get cached data
-        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.")
+        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.", "1y", "1d")
         
         if not (stock_data and stock_data.price_history is not None):
             if verbose:
@@ -377,7 +377,7 @@ def get_next_price_prediction(symbol):
         dict: Prediction results
     """
     try:
-        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.")
+        stock_data = get_cached_stock_data(symbol, f"{symbol} Corp.", "1y", "1d")
         if stock_data and stock_data.price_history is not None:
             close_prices = stock_data.price_history['close'].dropna().values
             
