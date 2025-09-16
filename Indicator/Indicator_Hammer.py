@@ -46,6 +46,8 @@ def create_hammer_chart_for_stock(parent_tag, symbol, container_height=540):
                 dpg.add_candle_series([], [], [], [], [], parent=y_axis_tag, tag=candle_tag)
                 # hammer markers
                 dpg.add_scatter_series([], [], label="Hammer", parent=y_axis_tag, tag=marker_tag)
+                create_hammer_scatter_theme()
+                dpg.bind_item_theme(marker_tag, "hammer_scatter_theme")
 
         # background thread: fetch + detect hammers
         thread = threading.Thread(
@@ -60,6 +62,16 @@ def create_hammer_chart_for_stock(parent_tag, symbol, container_height=540):
     except Exception as e:
         print(f"❌ Error creating Hammer chart for {symbol}: {e}")
         return None
+    
+def create_hammer_scatter_theme():
+    """Create a theme for hammer scatter markers"""
+    if not dpg.does_item_exist("hammer_scatter_theme"):
+        with dpg.theme(tag="hammer_scatter_theme"):
+            with dpg.theme_component(dpg.mvScatterSeries):
+                dpg.add_theme_color(dpg.mvPlotCol_Line, [255, 0, 0, 255], category=dpg.mvThemeCat_Plots)  # Red
+                dpg.add_theme_color(dpg.mvPlotCol_MarkerFill, [255, 255, 0, 255], category=dpg.mvThemeCat_Plots)  # Red fill
+                dpg.add_theme_style(dpg.mvPlotStyleVar_Marker, dpg.mvPlotMarker_Diamond, category=dpg.mvThemeCat_Plots)  # Diamond shape
+                dpg.add_theme_style(dpg.mvPlotStyleVar_MarkerSize, 8, category=dpg.mvThemeCat_Plots)  # Larger size
 
 def _fetch_and_plot_hammer(symbol, candle_tag, marker_tag, x_axis_tag, y_axis_tag, plot_tag, status_tag):
     """Fetch stock data and detect/plot hammer candles"""

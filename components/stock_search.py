@@ -5,6 +5,7 @@ import os
 stock_data = None
 chart_tags = {}
 
+from utils import constants
 from utils.stock_fetch_layer import fetch_stock_data
 from components.stock.stock_data_manager import add_stock_tag
 
@@ -48,6 +49,12 @@ def create_stock_search(mode="callback", callback=None, line_tag=None, x_axis_ta
     search_period = period
     search_interval = interval
     
+    #Cleanup was missing 
+    if dpg.does_item_exist("stock_search_popup"):
+        dpg.delete_item("stock_search_popup")
+    if dpg.does_item_exist("table_button_theme"):
+        dpg.delete_item("table_button_theme")
+        
     if line_tag and x_axis_tag and y_axis_tag and plot_tag:
         chart_tags = {
             'line_tag': line_tag,
@@ -65,7 +72,8 @@ def create_stock_search(mode="callback", callback=None, line_tag=None, x_axis_ta
         tag="stock_search_popup",
         width=550,
         height=600,
-        pos=[mouse_pos[0] + 10, mouse_pos[1] + 10],
+        #pos=[mouse_pos[0] + 10, mouse_pos[1] + 10],
+        pos=[constants.WinW/2 - (550/2),constants.WinH/2 - (660/2)],
         no_resize=True,
         no_collapse=True,
         modal=True,
