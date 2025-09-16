@@ -479,7 +479,8 @@ def _process_complete_result(symbol, data, source_name, line_tag, x_axis_tag, y_
     print(f"🔍 DEBUG: Using period={period}, interval={interval} for caching")
 
     # 1. Update chart immediately with price data
-    _update_chart_with_data(data, line_tag, x_axis_tag, y_axis_tag, plot_tag)
+    if line_tag:
+        _update_chart_with_data(data, line_tag, x_axis_tag, y_axis_tag, plot_tag)
 
     # 2. Convert to DataFrame for caching
     df = _convert_price_to_dataframe(data)
@@ -553,13 +554,8 @@ def _cache_complete_data(symbol, price_df, fundamentals, period="1d", interval="
         # Update stock tag if it exists
         _update_stock_tag_cache(symbol, stock_data)
 
-        # Save cache to file to persist the fundamental data
-        try:
-            from components.stock.stock_data_manager import save_cache_to_file
-            save_cache_to_file()
-            print(f"💾 Cache saved to file after updating {symbol}")
-        except Exception as e:
-            print(f"❌ Error saving cache to file: {e}")
+        # Individual cache saving is already handled by update_stock_data_cache()
+        print(f"💾 Individual cache entry saved for {symbol}")
 
         fund_summary = [k for k, v in fundamentals.items() if v] or ['none']
         print(f"✅ Complete data cached for {symbol}: price + fundamentals: {fund_summary}")

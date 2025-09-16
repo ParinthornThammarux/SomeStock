@@ -202,7 +202,7 @@ class StockTag:
         self.on_chart_click = on_chart_click
         
         # Initialize or get cached data
-        self.stock_data = get_cached_stock_data(self.symbol, self.company_name)
+        self.stock_data = get_cached_stock_data(self.symbol, self.company_name, "1y", "1d")
         
         # Create the visual component
         self.create_visual_component()
@@ -387,10 +387,6 @@ class StockTag:
             
             print(f"📊 Chart loaded from cache for {self.symbol}")
             return True
-            
-        except Exception as e:
-            print(f"[ERROR] Error loading chart from cache: {e}")
-            return False
                 
         except Exception as e:
             print(f"[ERROR] Error loading chart from cache: {e}")
@@ -508,14 +504,11 @@ _stock_data_cache: Dict[str, StockData] = {}
 _active_tags = []
 _focused_tag: Optional[StockTag] = None
 
-def _generate_cache_key(symbol: str, period: Optional[str] = None, interval: Optional[str] = None) -> str:
+def _generate_cache_key(symbol: str, period: str, interval: str) -> str:
     """Generate cache key that includes period and interval"""
-    # Use default values for backward compatibility
-    period = period or "1d"
-    interval = interval or "5m"
     return f"{symbol.upper()}_{period}_{interval}"
 
-def get_cached_stock_data(symbol: str, company_name: str, period: Optional[str] = None, interval: Optional[str] = None) -> StockData:
+def get_cached_stock_data(symbol: str, company_name: str, period: str, interval: str) -> StockData:
     """Get cached stock data or create new entry"""
     cache_key = _generate_cache_key(symbol, period, interval)
 
@@ -544,14 +537,14 @@ def get_cached_stock_data(symbol: str, company_name: str, period: Optional[str] 
     stock_data = StockData(
         symbol=symbol,
         company_name=company_name,
-        period=period or "1d",
-        interval=interval or "5m"
+        period=period,
+        interval=interval
     )
     _stock_data_cache[cache_key] = stock_data
 
     return stock_data
 
-def update_stock_data_cache(symbol: str, stock_data: StockData, period: Optional[str] = None, interval: Optional[str] = None):
+def update_stock_data_cache(symbol: str, stock_data: StockData, period: str, interval: str):
     """Update the cache with fresh stock data"""
     cache_key = _generate_cache_key(symbol, period, interval)
     print(f"🔄 Updating cache: {cache_key} with last_updated={stock_data.last_updated}")
@@ -638,8 +631,47 @@ def get_cache_path(symbol, company_name, period, interval):
     filename = f"{symbol}_{period}_{interval}.json"
     return symbol_dir, os.path.join(symbol_dir, filename)
 
+def is_valid_stock_data(stock_data, cache_key):
+    """Validate if stock data has essential fields populated"""
+    symbol = cache_key.split('_')[0]
+
+    # Check for essential price data
+    if stock_data.current_price is None or stock_data.current_price <= 0:
+        print(f"⚠️ Invalid cache for {cache_key}: missing or invalid current_price ({stock_data.current_price})")
+        return False
+
+    if stock_data.previous_price is None or stock_data.previous_price <= 0:
+        print(f"⚠️ Invalid cache for {cache_key}: missing or invalid previous_price ({stock_data.previous_price})")
+        return False
+
+    # Check for price history
+    if stock_data.price_history is None:
+        print(f"⚠️ Invalid cache for {cache_key}: missing price_history")
+        return False
+
+    # Handle both DataFrame and list formats for price_history
+    try:
+        if hasattr(stock_data.price_history, '__len__'):  # DataFrame or list
+            if len(stock_data.price_history) == 0:
+                print(f"⚠️ Invalid cache for {cache_key}: empty price_history")
+                return False
+        else:
+            print(f"⚠️ Invalid cache for {cache_key}: invalid price_history format")
+            return False
+    except Exception:
+        print(f"⚠️ Invalid cache for {cache_key}: unable to check price_history length")
+        return False
+
+    # Check for recent data (not older than cache duration)
+    if stock_data.last_updated is None:
+        print(f"⚠️ Invalid cache for {cache_key}: missing last_updated timestamp")
+        return False
+
+    # print(f"✅ Valid cache data for {cache_key}: price=${stock_data.current_price}, history={len(stock_data.price_history)} entries")
+    return True
+
 def save_individual_cache(cache_key, stock_data):
-    """Save individual stock cache to hierarchical structure"""
+    """Save individual stock cache to hierarchical structure with validation"""
     try:
         # Parse cache key: SYMBOL_period_interval
         parts = cache_key.split('_')
@@ -650,6 +682,11 @@ def save_individual_cache(cache_key, stock_data):
         symbol = parts[0]
         period = parts[1]
         interval = parts[2]
+
+        # Validate stock data before saving
+        if not is_valid_stock_data(stock_data, cache_key):
+            print(f"🚫 Skipping save for {cache_key} - incomplete data (will allow refetch)")
+            return False
 
         # Get company name from stock data
         company_name = stock_data.company_name or f"{symbol} Corp."
@@ -746,7 +783,7 @@ def load_cache_from_file():
 
                         # Debug log
                         fundamentals = {k: v for k, v in data_dict.items() if k in ['revenue', 'net_income', 'cash_flow', 'volume', 'change']}
-                        print(f"📁 Loaded {cache_key}: fundamentals = {fundamentals}")
+                        # print(f"📁 Loaded {cache_key}: fundamentals = {fundamentals}")
                         loaded_count += 1
 
                     except Exception as e:
@@ -759,6 +796,85 @@ def load_cache_from_file():
 
     except Exception as e:
         print(f"❌ Error loading cache: {e}")
+
+def purge_old_cache_files():
+    """Purge old/invalid cache files from disk on boot"""
+    import shutil
+
+    try:
+        cache_symbol_dir = os.path.join(CACHE_BASE_DIR, "Symbol")
+        if not os.path.exists(cache_symbol_dir):
+            print("📁 No cache directory found to purge")
+            return
+
+        print("🧹 Starting cache file purge on boot...")
+        deleted_files = 0
+        deleted_folders = 0
+        checked_files = 0
+
+        # Walk through all company folders
+        for company_folder in os.listdir(cache_symbol_dir):
+            company_path = os.path.join(cache_symbol_dir, company_folder)
+            if not os.path.isdir(company_path):
+                continue
+
+            valid_files_in_folder = 0
+            files_to_delete = []
+
+            # Check all cache files in this company folder
+            for filename in os.listdir(company_path):
+                if not filename.endswith('.json'):
+                    continue
+
+                filepath = os.path.join(company_path, filename)
+                checked_files += 1
+
+                try:
+                    with open(filepath, 'r') as f:
+                        data_dict = json.load(f)
+
+                    # Create StockData object to validate
+                    stock_data = StockData.from_dict(data_dict)
+                    cache_key = filename[:-5]  # Remove .json extension
+
+                    # Check if cache is valid using our validation function
+                    if is_valid_stock_data(stock_data, cache_key):
+                        # Also check if cache is stale (older than 10 minutes)
+                        if stock_data.is_cache_valid():
+                            valid_files_in_folder += 1
+                        else:
+                            print(f"🕒 Stale cache file (>10min): {filepath}")
+                            files_to_delete.append(filepath)
+                    else:
+                        print(f"🗑️ Invalid cache file: {filepath}")
+                        files_to_delete.append(filepath)
+
+                except Exception as e:
+                    print(f"🗑️ Corrupt cache file: {filepath} - {e}")
+                    files_to_delete.append(filepath)
+
+            # Delete invalid files
+            for filepath in files_to_delete:
+                try:
+                    os.remove(filepath)
+                    deleted_files += 1
+                    print(f"🗑️ Deleted invalid cache: {os.path.basename(filepath)}")
+                except Exception as e:
+                    print(f"❌ Failed to delete {filepath}: {e}")
+
+            # If no valid files remain, delete the entire company folder
+            if valid_files_in_folder == 0 and len(os.listdir(company_path)) == 0:
+                try:
+                    shutil.rmtree(company_path)
+                    deleted_folders += 1
+                    print(f"🗂️ Deleted empty company folder: {company_folder}")
+                except Exception as e:
+                    print(f"❌ Failed to delete folder {company_path}: {e}")
+
+        print(f"✅ Cache purge complete: checked {checked_files} files, deleted {deleted_files} invalid/stale files, deleted {deleted_folders} empty folders")
+
+    except Exception as e:
+        print(f"❌ Error during cache purge: {e}")
 
 def cleanup_cache():
     """Clean up old cache entries"""
@@ -871,4 +987,5 @@ def refresh_all_tags():
 
 
 # Initialize cache on module load
+purge_old_cache_files()  # Purge invalid cache files before loading
 load_cache_from_file()

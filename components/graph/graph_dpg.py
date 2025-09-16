@@ -204,8 +204,6 @@ def create_main_graph(parent_tag, timestamp=None):
             dpg.add_spacer(width=10)
             dpg.add_button(label="Refresh All Cache", callback=refresh_all_cache, width=150)
             dpg.add_spacer(width=10)
-            dpg.add_button(label="Save Cache", callback=save_cache, width=120)
-            dpg.add_spacer(width=10)
             dpg.add_button(label="Export CSV", callback=export_data, width=120)
             dpg.add_spacer(width=10)
             dpg.add_button(label="Clear Table", callback=clear_table, width=120)
@@ -291,7 +289,7 @@ def plus_button_callback():
     """Open stock search dialog with current period/interval settings"""
     global current_period_combo_tag, current_interval_combo_tag
 
-    print("Plus button clicked!")
+    print("+ button clicked!")
 
     # Get current period and interval from dropdowns
     period = "1y"  # Default fallback
@@ -317,7 +315,8 @@ def plus_button_callback():
         y_axis_tag=current_y_axis_tag,
         plot_tag=current_plot_tag,
         period=period,
-        interval=interval
+        interval=interval,
+        callback=refresh_table_data()
     )
 
 def fav_button_callback():
@@ -386,18 +385,6 @@ def refresh_all_cache():
     except Exception as e:
         print(f"❌ Error refreshing all cache: {e}")
 
-def save_cache():
-    """Save cache to file"""
-    try:
-        from components.stock.stock_data_manager import save_cache_to_file, cleanup_cache
-        
-        cleanup_cache()  # Clean up old entries first
-        save_cache_to_file()
-        
-        print("✅ Cache saved successfully")
-        
-    except Exception as e:
-        print(f"❌ Error saving cache: {e}")
 
 def clear_table():
     """Clear all entries from the table"""
@@ -482,22 +469,25 @@ def refresh_table_data():
         except Exception as e:
             print(f"❌ Error refreshing table: {e}")
 
+
 def add_stock_to_portfolio_table(symbol):
-    """Public interface - Add a stock row to the portfolio table using cached data - THREAD SAFE"""
+    """Public interface - Add or update a stock row in the portfolio table using cached data - THREAD SAFE"""
     global table_lock
-    
+
     with table_lock:
         try:
             # Check if symbol already exists
             if symbol_exists_in_table(symbol):
-                print(f"📋 {symbol} already exists in table, skipping addition")
+                print(f"🔄 {symbol} exists in table, refreshing all data...")
+                refresh_table_data()
+                print(f"✅ Table refreshed with updated {symbol} data")
                 return
-            
+
             _add_stock_to_table_internal(symbol)
             print(f"✅ Added {symbol} to table (thread-safe)")
-            
+
         except Exception as e:
-            print(f"❌ Failed to add {symbol} to table: {e}")
+            print(f"❌ Failed to add/update {symbol} in table: {e}")
 
 def _add_stock_to_table_internal(symbol):
     """Internal function to add stock to table - assumes lock is held"""
