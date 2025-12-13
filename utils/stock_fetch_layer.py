@@ -1,4 +1,5 @@
 # utils/stock_fetch_layer.py - Unified Fetch Version
+# DEPRECATED: Use core.data_fetch instead
 
 import dearpygui.dearpygui as dpg
 import time
@@ -6,6 +7,16 @@ import pandas as pd
 from utils import constants
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+
+# Compatibility wrapper for new Streamlit version
+def fetch_stock_data(symbol, period="1y", interval="1d"):
+    """
+    NEW SIGNATURE - Wrapper for the Streamlit version
+    Legacy code should call fetch_stock_data_dearpygui instead
+    """
+    from core.data_fetch import fetch_stock_data as new_fetch
+    return new_fetch(symbol, period=period, interval=interval)
 
 # =============================================================================
 # GLOBAL CONFIGURATION
@@ -28,9 +39,10 @@ active_fetches = {}  # {symbol: {'stop_flag': threading.Event(), 'result': None}
 # MAIN ENTRY POINT
 # =============================================================================
 
-def fetch_stock_data(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag, period="1d", interval="5m"):
+def fetch_stock_data_deprecated(symbol, line_tag, x_axis_tag, y_axis_tag, plot_tag, period="1d", interval="5m"):
     """
-    Unified fetch - gets ALL data from each source in a single call
+    DEPRECATED: This function is from the old DearPyGUI version.
+    Use core.data_fetch.fetch_stock_data instead.
     """
     print("=" * 80)
     print(f"🚀 UNIFIED FETCH FOR: {symbol}")

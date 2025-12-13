@@ -5,6 +5,7 @@ __pycache__/
 
 favorite_stocks.json
 .claude
+guideline.md
 
 # C extensions
 *.so

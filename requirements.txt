@@ -1,5 +1,5 @@
-# Core GUI Framework
-dearpygui>=1.11.1
+# Web Framework (Migrated from DearPyGUI)
+streamlit>=1.28.0
 
 # Data Analysis and Visualization
 pandas>=2.0.0

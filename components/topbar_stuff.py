@@ -9,12 +9,7 @@ def create_top_menu():
     create_close_dialog()
     dpg.set_item_pos("close_dialog", (constants.WinW // 2 - 150, constants.WinH // 2 - 75))
     with dpg.menu_bar():
-        with dpg.menu(label="Profile", tag='user'):
-            with dpg.group(horizontal=True):
-                dpg.add_text("Hello :", color=[180, 180, 180])  # Medium gray
-                dpg.add_text("Guest", color=[255, 200, 100],tag="user_welcome_message" )  # Warm orange
-            dpg.add_menu_item(label="Create User", callback=lambda: (show_page("user_create")))
-            dpg.add_menu_item(label="Login User", callback=lambda: (show_page("user_login")))
+        with dpg.menu(label="File", tag='file'):
             dpg.add_menu_item(label="Save Data", callback=lambda: (dpg.show_item("option_window"), dpg.focus_item("option_window")))
 
         dpg.add_button(label="Options", callback=lambda: dpg.configure_item("about_window", show=True))
