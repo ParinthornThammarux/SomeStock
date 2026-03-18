@@ -6,6 +6,7 @@ __pycache__/
 favorite_stocks.json
 .claude
 guideline.md
+.csv
 
 # C extensions
 *.so
@@ -205,3 +206,4 @@ registered_users/*
 cache/
 cache/*
 stock_cache.json
+TrainMLModel/predictions.csv

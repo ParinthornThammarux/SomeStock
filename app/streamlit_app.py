@@ -28,7 +28,7 @@ if 'current_page' not in st.session_state:
 st.sidebar.title("📈 Stock Analysis")
 page = st.sidebar.radio(
     "Navigation",
-    ["Welcome", "Search Stock", "Dashboard", "Indicators", "Custom Analysis"],
+    ["Welcome", "Search Stock", "Dashboard", "Indicators", "Custom Analysis","Gold"],
     key="page_selector"
 )
 
@@ -43,6 +43,8 @@ elif page == "Indicators":
     st.session_state.current_page = "indicators"
 elif page == "Custom Analysis":
     st.session_state.current_page = "custom"
+elif page == "Gold":
+    st.session_state.current_page = "Gold"
 
 # Import and render pages
 import sys
@@ -53,6 +55,7 @@ from pages.search import render as search_render
 from pages.dashboard import render as dashboard_render
 from pages.indicators import render as indicators_render
 from pages.custom_content import render as custom_render
+from pages.Gold_page import render as gold_render
 
 page_map = {
     "welcome": welcome_render,
@@ -60,6 +63,7 @@ page_map = {
     "dashboard": dashboard_render,
     "indicators": indicators_render,
     "custom": custom_render,
+    "Gold": gold_render
 }
 
 # Render the current page

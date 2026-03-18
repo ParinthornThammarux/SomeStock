@@ -1,145 +1,130 @@
+# ================================
+# 1. Import Libraries
+# ================================
 import yfinance as yf
 import pandas as pd
 import numpy as np
+
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
+from xgboost import XGBRegressor
+
 import matplotlib.pyplot as plt
 
-from sklearn.preprocessing import StandardScaler
-from tensorflow.keras.layers import Input, Dense, Dropout, LayerNormalization, MultiHeadAttention, GlobalAveragePooling1D
-from tensorflow.keras.models import Model
+# ================================
+# 2. Download Data
+# ================================
+tickers = {
+    "gold": "GC=F",
+    "dxy": "DX=F",
+    "sp500": "^GSPC",
+    "oil": "CL=F",
+    "bond": "^TNX"
+}
 
-# ---------------------------
-# 1. โหลดข้อมูล
-# ---------------------------
-data = yf.download("GC=F", start="2015-01-01", end="2025-01-01")
+data = {}
 
-# ---------------------------
-# 2. Feature Engineering
-# ---------------------------
-data['Return'] = data['Close'].pct_change()
-data['MA20'] = data['Close'].rolling(20).mean()
-data['MA50'] = data['Close'].rolling(50).mean()
-data['Volatility'] = data['Close'].rolling(20).std()
-data['Momentum'] = data['Close'] - data['Close'].shift(10)
+for name, ticker in tickers.items():
+    df = yf.download(ticker, start="2016-01-01", progress=True)
 
-data = data.dropna()
+    if df.empty or "Close" not in df.columns:
+        continue
 
-# ใช้ Return เป็น target (column 0)
-features = data[['Return', 'MA20', 'MA50', 'Volatility', 'Momentum']]
+    data[name] = df["Close"]
 
-# ---------------------------
-# 3. Train/Test Split
-# ---------------------------
-train_size = int(len(features) * 0.8)
+if len(data) == 0:
+    raise ValueError("No data downloaded!")
 
-train_data = features[:train_size]
-test_data = features[train_size:]
+df = pd.concat(data, axis=1)
+df.columns = data.keys()
+df.dropna(inplace=True)
 
-# ใช้ StandardScaler (สำคัญมาก)
-scaler = StandardScaler()
-scaler.fit(train_data)
+# ================================
+# 3. Feature Engineering
+# ================================
+for col in df.columns:
+    df[f"{col}_lag1"] = df[col].shift(1)
+    df[f"{col}_lag3"] = df[col].shift(3)
+    df[f"{col}_lag7"] = df[col].shift(7)
 
-scaled_train = scaler.transform(train_data)
-scaled_test = scaler.transform(test_data)
+df["gold_ma7"] = df["gold"].rolling(7).mean()
+df["gold_ma14"] = df["gold"].rolling(14).mean()
 
-scaled_data = np.concatenate((scaled_train, scaled_test), axis=0)
+# ================================
+# 4. Target
+# ================================
+df["target"] = df["gold"].shift(-7)
+df.dropna(inplace=True)
 
-# ---------------------------
-# 4. Create Dataset
-# ---------------------------
-def create_dataset(data, window=120):
-    X, y = [], []
-    for i in range(window, len(data)):
-        X.append(data[i-window:i])
-        y.append(data[i][0])  # Return
-    return np.array(X), np.array(y)
+# ================================
+# 5. Split
+# ================================
+X = df.drop(columns=["target"])
+y = df["target"]
 
-window_size = 120
-X, y = create_dataset(scaled_data, window_size)
-
-# split sequence
-split = int(len(X) * 0.8)
-
-X_train, X_test = X[:split], X[split:]
-y_train, y_test = y[:split], y[split:]
-
-# ---------------------------
-# 5. Transformer Model
-# ---------------------------
-def transformer_encoder(inputs, head_size, num_heads, ff_dim, dropout=0):
-    x = MultiHeadAttention(key_dim=head_size, num_heads=num_heads)(inputs, inputs)
-    x = Dropout(dropout)(x)
-    x = LayerNormalization(epsilon=1e-6)(x + inputs)
-
-    ff = Dense(ff_dim, activation="relu")(x)
-    ff = Dense(inputs.shape[-1])(ff)
-    ff = Dropout(dropout)(ff)
-
-    return LayerNormalization(epsilon=1e-6)(x + ff)
-
-inputs = Input(shape=(window_size, X.shape[2]))
-
-x = transformer_encoder(inputs, 64, 4, 128, 0.2)
-x = transformer_encoder(x, 64, 4, 128, 0.2)
-
-x = GlobalAveragePooling1D()(x)
-x = Dense(64, activation="relu")(x)
-x = Dropout(0.2)(x)
-outputs = Dense(1)(x)
-
-model = Model(inputs, outputs)
-
-model.compile(optimizer="adam", loss="mae")
-
-model.summary()
-
-# ---------------------------
-# 6. Train
-# ---------------------------
-history = model.fit(
-    X_train,
-    y_train,
-    epochs=60,
-    batch_size=32,
-    validation_data=(X_test, y_test),
-    shuffle=False
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, shuffle=False
 )
 
-# ---------------------------
-# 7. Predict (scaled return)
-# ---------------------------
-pred_scaled = model.predict(X_test)
+# ================================
+# 6. Train
+# ================================
+lr_model = LinearRegression()
+lr_model.fit(X_train, y_train)
 
-# ---------------------------
-# 8. Inverse Scale Return (สำคัญ!)
-# ---------------------------
-dummy = np.zeros((len(pred_scaled), scaled_data.shape[1]))
-dummy[:, 0] = pred_scaled[:, 0]
+xgb_model = XGBRegressor(
+    n_estimators=300,
+    learning_rate=0.05,
+    max_depth=5,
+    random_state=42
+)
+xgb_model.fit(X_train, y_train)
 
-pred_return = scaler.inverse_transform(dummy)[:, 0]
+# ================================
+# 7. Predict
+# ================================
+lr_pred = lr_model.predict(X_test)
+xgb_pred = xgb_model.predict(X_test)
 
-# ---------------------------
-# 9. Convert Return → Price
-# ---------------------------
-close_prices = data['Close'].values
+# ================================
+# 📊 8. Plot (เฉพาะ 1 ปีล่าสุด)
+# ================================
+# รวมเป็น DataFrame
+# plot_df = pd.DataFrame({
+#     "Actual": y_test,
+#     "Linear Regression": lr_pred,
+#     "XGBoost": xgb_pred
+# }, index=y_test.index)
 
-start_index = train_size + window_size
-last_price = close_prices[start_index]
+# # เอาแค่ 1 ปีล่าสุด
+# plot_df = plot_df.last("365D")
 
-pred_prices = []
+# plt.figure(figsize=(12,6))
 
-for r in pred_return:
-    last_price = last_price * (1 + r)
-    pred_prices.append(last_price)
+# plt.plot(plot_df.index, plot_df["Actual"], label="Actual")
+# plt.plot(plot_df.index, plot_df["Linear Regression"], label="Linear Regression")
+# plt.plot(plot_df.index, plot_df["XGBoost"], label="XGBoost")
 
-# Real prices
-real_prices = close_prices[start_index:start_index + len(pred_prices)]
+# plt.title("Gold Price Prediction vs Actual (Last 1 Year)")
+# plt.xlabel("Date")
+# plt.ylabel("Price")
+# plt.legend()
 
-# ---------------------------
-# 10. Plot
-# ---------------------------
-plt.figure(figsize=(12,6))
-plt.plot(real_prices, label="Real Price")
-plt.plot(pred_prices, label="Predicted Price")
-plt.title("Gold Price Prediction (Transformer - Fixed)")
-plt.legend()
-plt.show()
+# plt.show()
+
+# ================================
+# Save Results ✅
+# ================================
+result_df = pd.DataFrame({
+    "Actual": y_test,
+    "Linear Regression": lr_pred,
+    "XGBoost": xgb_pred
+}, index=y_test.index)
+
+# เอาแค่ 1 ปีล่าสุด
+result_df = result_df.last("365D")
+
+result_df.to_csv("predictions.csv")
+
+print("✅ Saved predictions.csv")
