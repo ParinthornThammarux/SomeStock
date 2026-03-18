@@ -5,8 +5,9 @@ pages/dashboard.py - Comprehensive stock dashboard with multiple indicators
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from core.data_fetch import fetch_stock_data
+from core.data_fetch import fetch_stock_data , fetch_financials
 from core.indicators import ema, sma, rsi, momentum
+from core.utils import format_money
 
 
 def render():
@@ -40,7 +41,7 @@ def render():
                     mom10 = momentum.calculate_momentum(close_prices, timeperiod=10)
                     
                     # Create tabs
-                    tab1, tab2, tab3, tab4 = st.tabs(["Price & EMAs", "Moving Averages", "RSI", "Momentum"])
+                    tab1, tab2, tab3, tab4 ,tab5 = st.tabs(["Price & EMAs", "Moving Averages", "RSI", "Momentum" , "Financials"])
                     
                     with tab1:
                         st.subheader(f"{symbol} - Price with EMA Crossover")
@@ -76,6 +77,23 @@ def render():
                         fig.add_hline(y=0, line_dash="dash", line_color="gray")
                         fig.update_layout(hovermode='x unified', height=400)
                         st.plotly_chart(fig, use_container_width=True)
+                    with tab5:
+                        st.subheader(f"{symbol} Financial Statements")
+
+                        financials = fetch_financials(symbol)
+
+                        income = financials["income_statement"]
+                        balance = financials["balance_sheet"]
+                        cashflow = financials["cashflow"]
+
+                        st.write("### Income Statement")
+                        st.dataframe(income.applymap(format_money))
+
+                        st.write("### Balance Sheet")
+                        st.dataframe(balance.applymap(format_money))
+
+                        st.write("### Cash Flow")
+                        st.dataframe(cashflow.applymap(format_money))
                     
                 else:
                     st.error(f"Could not fetch data for {symbol}")

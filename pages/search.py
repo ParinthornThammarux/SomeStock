@@ -35,11 +35,10 @@ def render():
     col1, col2 = st.columns([3, 1])
     
     with col1:
-        symbol = st.selectbox(
-            "Select or search for a stock symbol:",
-            stock_symbols if stock_symbols else ["AAPL", "GOOGL", "MSFT", "TSLA"],
-            index=0
-        )
+        symbol = st.text_input(
+            "Enter stock symbol:",
+            value="AAPL"
+        ).upper()
     
     with col2:
         period = st.selectbox(

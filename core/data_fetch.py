@@ -77,3 +77,12 @@ def fetch_multiple_stocks(symbols: list, period: str = "1y", interval: str = "1d
         time.sleep(0.5)  # Rate limiting
     
     return results
+
+def fetch_financials(symbol):
+    ticker = yf.Ticker(symbol)
+
+    return {
+        "income_statement": ticker.financials,
+        "balance_sheet": ticker.balance_sheet,
+        "cashflow": ticker.cashflow
+    }

@@ -49,3 +49,13 @@ def get_ohlcv_columns(df: pd.DataFrame) -> tuple:
         df[cols['close']].values,
         df[cols['volume']].values
     )
+def format_money(value):
+    if pd.isna(value):
+        return "-"
+    
+    if abs(value) >= 1_000_000_000:
+        return f"{value/1_000_000_000:.2f} B"
+    elif abs(value) >= 1_000_000:
+        return f"{value/1_000_000:.2f} M"
+    else:
+        return f"{value:,.0f}"
