@@ -20,7 +20,7 @@ def load_stock_list():
 
 def render():
     """Render the stock search page"""
-    st.title("🔍 Search Stock")
+    st.title("Search Stock")
     st.markdown("---")
     
     # Load available stocks

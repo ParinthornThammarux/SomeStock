@@ -30,7 +30,7 @@ def plot_chart(df):
 # Main Render Function
 # ================================
 def render():
-    st.title("🥇 Gold Price Prediction Dashboard (Linear Regression)")
+    st.title("Gold Price Prediction Dashboard")
 
     df = load_data()
 
@@ -43,12 +43,12 @@ def render():
     col1, col2 = st.columns(2)
 
     col1.metric(
-        "📌 Gold Price (Latest)",
+        "Gold Price (Latest)",
         f"{latest_actual:,.2f}"
     )
 
     col2.metric(
-        "🔮 Predicted Price (7 Days Ahead)",
+        "Predicted Price (7 Days Ahead)",
         f"{latest_pred:,.2f}",
         delta=f"{latest_pred - latest_actual:,.2f}"
     )

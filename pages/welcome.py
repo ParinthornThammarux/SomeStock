@@ -12,7 +12,7 @@ def render():
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
-        st.title("📈 Welcome to SomeStock")
+        st.title("Welcome to SomeStock")
         st.markdown("---")
         
         st.write("### A Stock Analysis Tool using Technical Indicators")
@@ -21,10 +21,10 @@ def render():
         **Version:** {constants.VERSION}
         
         This application provides:
-        - 📊 Real-time stock data fetching
-        - 📈 Technical indicators (EMA, SMA, RSI, Momentum)
-        - 🎯 Candlestick pattern detection (Doji, Hammer)
-        - 📉 Trend analysis and crossover signals
+        - Real-time stock data fetching
+        - Technical indicators (EMA, SMA, RSI, Momentum)
+        - Candlestick pattern detection (Doji, Hammer)
+        - Trend analysis and crossover signals
         
         #### Get Started:
         1. Use the **Search Stock** page to find and analyze stocks
@@ -34,4 +34,4 @@ def render():
         """)
         
         st.markdown("---")
-        st.info("ℹ️ Select a page from the sidebar to begin!")
+        st.info("Select a page from the sidebar to begin!")

@@ -12,7 +12,7 @@ from core.indicators import ema, sma, rsi, momentum, patterns
 
 def render():
     """Render the indicators page"""
-    st.title("🎯 Technical Indicators")
+    st.title("Technical Indicators")
     st.markdown("---")
     
     # Sidebar configuration

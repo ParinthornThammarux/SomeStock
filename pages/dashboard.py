@@ -12,7 +12,7 @@ from core.utils import format_money
 
 def render():
     """Render the dashboard page"""
-    st.title("📊 Dashboard")
+    st.title("Dashboard")
     st.markdown("---")
     
     # Sidebar controls

@@ -332,7 +332,7 @@ def add_fibonacci(fig, df, high_col, low_col, lookback=200):
 # Page
 # ----------------------------
 def render():
-    st.title("⚙️ Custom Analysis")
+    st.title("Custom Analysis")
     st.markdown("---")
 
     col_config, col_analysis = st.columns([1, 3])
@@ -344,7 +344,7 @@ def render():
         period = st.selectbox("Period:", ["1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "max"], index=3)
         timeframe = st.selectbox("Timeframe:", ['1h',"1d", "1wk", "1mo"], index=0, help="Interval for candlestick chart")
 
-        st.markdown("### Zone Logic Settings")
+        st.markdown("Zone Logic Settings")
         lookback_bars = st.slider("Bars to Apply (Lookback)", 100, 1200, 300, step=50)
         pivot_strength = st.slider("Pivot Strength", 2, 12, 4)
         min_confirmations = st.slider("Min Pivot Confirmation", 2, 8, 3)
